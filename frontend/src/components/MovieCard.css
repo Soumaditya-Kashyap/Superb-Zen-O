@@ -1,0 +1,81 @@
+.movie-card-dynamic {
+  position: relative;
+  min-width: 220px;
+  height: 330px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.movie-card-dynamic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.movie-card-dynamic:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
+}
+
+.movie-card-dynamic:hover img {
+  transform: scale(1.1);
+}
+
+.movie-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 60%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.movie-card-dynamic:hover .movie-overlay {
+  opacity: 1;
+}
+
+.movie-overlay h3 {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 5px 0;
+  line-height: 1.3;
+}
+
+.movie-year {
+  color: #D4AF37;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0 0 10px 0;
+}
+
+.play-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: #D4AF37;
+  border: none;
+  color: #000000;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  align-self: flex-start;
+}
+
+.play-btn:hover {
+  background: #F5D776;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
+}
