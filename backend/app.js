@@ -2,6 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const fetch = require("node-fetch");
+const bodyParser = require('body-parser');
+
+
+
 
 // Load environment variables
 dotenv.config();
@@ -153,6 +158,13 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
+
+// Routes
+app.use("/api/auth", require("./routes/auth"));
+
+
+
+
 
 // Start server
 app.listen(PORT, () => {
