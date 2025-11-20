@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const fetch = require("node-fetch");
-const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 
 
 
@@ -29,9 +29,13 @@ mongoose.connect(MONGODB_URI, {
   });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // Frontend URL
+  credentials: true // Allow cookies
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // OMDb API Key
 const OMDB_API_KEY = process.env.OMDB_API_KEY;

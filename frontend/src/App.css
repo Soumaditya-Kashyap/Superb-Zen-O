@@ -10,3 +10,10 @@
   width: calc(100% - 80px);
   background: #000000;
 }
+
+main:not(.main-content) {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
