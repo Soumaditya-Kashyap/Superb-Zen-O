@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { MdLogout, MdAccountCircle } from 'react-icons/md';
-import './MySpace.css';
 
 const MySpace = () => {
   const navigate = useNavigate();
@@ -47,45 +46,54 @@ const MySpace = () => {
   };
 
   return (
-    <div className="myspace-page">
-      <div className="profile-section">
-        <div className="profile-avatar">
-          <span>{getInitials(user.name)}</span>
+    <div className="px-10 py-10 min-h-screen bg-black">
+      <div className="glass-effect-dark rounded-2xl p-8 mb-10 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-gold to-gold-light flex items-center justify-center text-black text-3xl font-bold">
+            {getInitials(user.name)}
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">{user.name || 'User Profile'}</h1>
+            <p className="text-gold-light text-lg mb-1">@{user.nickName || 'username'}</p>
+            <p className="text-white/60">{user.email || 'email@example.com'}</p>
+            <p className="text-white/40 text-sm mt-2">Member since {formatDate(user.createdAt)}</p>
+          </div>
         </div>
-        <div className="profile-info">
-          <h1>{user.name || 'User Profile'}</h1>
-          <p className="profile-nickname">@{user.nickName || 'username'}</p>
-          <p className="profile-email">{user.email || 'email@example.com'}</p>
-          <p className="profile-member">Member since {formatDate(user.createdAt)}</p>
-        </div>
-        <button className="logout-button" onClick={handleLogout}>
-          <MdLogout className="logout-icon" />
+        <button 
+          className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+          onClick={handleLogout}
+        >
+          <MdLogout size={20} />
           <span>Logout</span>
         </button>
       </div>
 
-      <section className="space-section">
-        <h2>Continue Watching</h2>
-        <div className="content-grid">
+      <section className="mb-12">
+        <h2 className="text-3xl font-bold text-white mb-6">Continue Watching</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {watchHistory.map((item) => (
-            <div key={item.id} className="content-card">
-              <img src={item.thumbnail} alt={item.title} />
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${item.progress}%` }}></div>
+            <div key={item.id} className="group relative rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105">
+              <img src={item.thumbnail} alt={item.title} className="w-full h-48 object-cover" />
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/20">
+                <div className="h-full bg-gradient-to-r from-gold to-gold-light" style={{ width: `${item.progress}%` }}></div>
               </div>
-              <h3>{item.title}</h3>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4">
+                <h3 className="text-white font-semibold">{item.title}</h3>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="space-section">
-        <h2>My Watchlist</h2>
-        <div className="content-grid">
+      <section>
+        <h2 className="text-3xl font-bold text-white mb-6">My Watchlist</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {watchlist.map((item) => (
-            <div key={item.id} className="content-card">
-              <img src={item.thumbnail} alt={item.title} />
-              <h3>{item.title}</h3>
+            <div key={item.id} className="group relative rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105">
+              <img src={item.thumbnail} alt={item.title} className="w-full h-48 object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4">
+                <h3 className="text-white font-semibold">{item.title}</h3>
+              </div>
             </div>
           ))}
         </div>

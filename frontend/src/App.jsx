@@ -10,7 +10,6 @@ import Sparks from './pages/Sparks';
 import Categories from './pages/Categories';
 import MySpace from './pages/MySpace';
 import Auth from './pages/Auth';
-import './App.css';
 
 // Protected Route Component
 function ProtectedRoute({ children, setIsAuthenticated }) {
@@ -79,22 +78,16 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        background: '#000'
-      }}>
+      <div className="flex justify-center items-center h-screen bg-black">
         <div className="loading-spinner"></div>
       </div>
     );
   }
 
   return (
-    <div className="app">
+    <div className="flex min-h-screen bg-black">
       {isAuthenticated && <Navbar />}
-      <main className={isAuthenticated ? "main-content" : ""}>
+      <main className={isAuthenticated ? "flex-1 ml-20 w-[calc(100%-5rem)] bg-black" : "w-full flex justify-center items-center"}>
         <Routes>
           <Route path="/auth" element={
             isAuthenticated ? <Navigate to="/" replace /> : <Auth setIsAuthenticated={setIsAuthenticated} />

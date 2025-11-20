@@ -3,7 +3,6 @@ import { AiOutlineSearch } from 'react-icons/ai';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
-import './Search.css';
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,32 +49,35 @@ const Search = () => {
   };
 
   return (
-    <div className="search-page">
-      <div className="search-header">
-        <h1>Search</h1>
-        <div className="search-bar">
-          <AiOutlineSearch className="search-icon" />
+    <div className="px-10 py-10 min-h-screen bg-black">
+      <div className="mb-10">
+        <h1 className="text-5xl font-bold text-white mb-6">Search</h1>
+        <div className="relative max-w-3xl">
+          <AiOutlineSearch className="absolute left-5 top-1/2 -translate-y-1/2 text-white/40" size={24} />
           <input
             type="text"
             placeholder="Search for movies, TV shows..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-16 pr-6 py-4 glass-effect text-white text-lg placeholder:text-white/40 rounded-xl border border-white/10 focus:border-gold focus:outline-none transition-colors"
           />
         </div>
       </div>
 
       {loading && (
-        <div className="loading-container">
+        <div className="flex flex-col items-center justify-center py-20">
           <div className="loading-spinner"></div>
-          <p>Searching...</p>
+          <p className="text-white/60 mt-4">Searching...</p>
         </div>
       )}
 
       {!loading && hasSearched && searchQuery && (
-        <div className="search-results">
-          <h2>Results for "{searchQuery}" ({searchResults.length})</h2>
+        <div>
+          <h2 className="text-2xl font-semibold text-white mb-6">
+            Results for <span className="text-gold">"{searchQuery}"</span> ({searchResults.length})
+          </h2>
           {searchResults.length > 0 ? (
-            <div className="results-grid">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {searchResults.map((movie) => (
                 <MovieCard 
                   key={movie.imdbID} 
@@ -85,23 +87,22 @@ const Search = () => {
               ))}
             </div>
           ) : (
-            <div className="no-results">
-              <p>No movies or shows found for "{searchQuery}"</p>
-              <p className="suggestion">Try different keywords or check your spelling</p>
+            <div className="text-center py-20">
+              <p className="text-white/70 text-lg mb-2">No movies or shows found for "{searchQuery}"</p>
+              <p className="text-white/40">Try different keywords or check your spelling</p>
             </div>
           )}
         </div>
       )}
 
       {!searchQuery && !hasSearched && (
-        <div className="search-placeholder">
-          <AiOutlineSearch size={80} />
-          <p>Start typing to search movies and TV shows</p>
-          <p className="search-hint">Try searching for "Avengers", "Batman", or "Star Wars"</p>
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <AiOutlineSearch size={80} className="text-white/20 mb-6" />
+          <p className="text-white/60 text-xl mb-2">Start typing to search movies and TV shows</p>
+          <p className="text-white/40">Try searching for "Avengers", "Batman", or "Star Wars"</p>
         </div>
       )}
 
-      {/* Movie Details Modal */}
       {selectedMovie && (
         <MovieDetails 
           imdbId={selectedMovie} 

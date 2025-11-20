@@ -1,88 +1,43 @@
-/* Color Variables */
-:root {
-  --color-black: #000000;
-  --color-white: #ffffff;
-  --color-gold: #D4AF37;
-  --color-gold-light: #F5D776;
-  --color-gray: #888888;
-  --color-gray-dark: #444444;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-white antialiased overflow-x-hidden;
+  }
+  
+  #root {
+    @apply min-h-screen w-full;
+  }
 }
 
-/* Reset & Base Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer components {
+  .loading-spinner {
+    @apply w-12 h-12 border-4 border-gold/20 border-t-gold rounded-full animate-spin;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-2.5 h-2.5;
+  }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  background-color: var(--color-black);
-  color: var(--color-white);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-}
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-white/5;
+  }
 
-#root {
-  min-height: 100vh;
-  width: 100%;
-}
-
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(212, 175, 55, 0.3);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 175, 55, 0.5);
-}
-
-/* Selection */
-::selection {
-  background: var(--color-gold);
-  color: var(--color-black);
-}
-
-/* Links */
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-/* Button Reset */
-button {
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-/* Image Optimization */
-img {
-  max-width: 100%;
-  display: block;
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gold/30 rounded-md hover:bg-gold/50;
+  }
+  
+  .text-gold-gradient {
+    @apply bg-gradient-to-r from-gold to-gold-light bg-clip-text text-transparent;
+  }
+  
+  .glass-effect {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10;
+  }
+  
+  .glass-effect-dark {
+    @apply bg-black/70 backdrop-blur-xl border border-gold/20;
+  }
 }

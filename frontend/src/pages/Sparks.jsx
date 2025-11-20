@@ -1,4 +1,4 @@
-import './Sparks.css';
+
 
 const Sparks = () => {
   const sparks = [
@@ -11,18 +11,18 @@ const Sparks = () => {
   ];
 
   return (
-    <div className="sparks-page">
-      <div className="page-header">
-        <h1>Sparks</h1>
-        <p>Short clips and fun content</p>
+    <div className="px-10 py-10 min-h-screen bg-black">
+      <div className="mb-10">
+        <h1 className="text-5xl font-bold text-white mb-2">Sparks</h1>
+        <p className="text-gray-400 text-lg">Short clips and fun content</p>
       </div>
 
-      <div className="sparks-grid">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {sparks.map((spark) => (
-          <div key={spark.id} className="spark-card">
-            <img src={spark.thumbnail} alt={spark.title} />
-            <div className="spark-overlay">
-              <h3>{spark.title}</h3>
+          <div key={spark.id} className="group relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-105 hover:shadow-2xl hover:shadow-gold/20">
+            <img src={spark.thumbnail} alt={spark.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+              <h3 className="text-white font-semibold text-sm">{spark.title}</h3>
             </div>
           </div>
         ))}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { Play, Users, X, Star } from 'lucide-react';
 import MovieService from '../services/movieService';
-import './MovieDetails.css';
 
 const MovieDetails = ({ imdbId, onClose }) => {
   const [movie, setMovie] = useState(null);
@@ -32,10 +32,10 @@ const MovieDetails = ({ imdbId, onClose }) => {
 
   if (loading) {
     return (
-      <div className="movie-details-modal" onClick={onClose}>
-        <div className="movie-details-content loading" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+        <div className="glass-effect-dark p-12 rounded-2xl text-center" onClick={(e) => e.stopPropagation()}>
           <div className="loading-spinner"></div>
-          <p>Loading movie details...</p>
+          <p className="text-white/60 mt-4">Loading movie details...</p>
         </div>
       </div>
     );
@@ -43,10 +43,12 @@ const MovieDetails = ({ imdbId, onClose }) => {
 
   if (error || !movie) {
     return (
-      <div className="movie-details-modal" onClick={onClose}>
-        <div className="movie-details-content error" onClick={(e) => e.stopPropagation()}>
-          <button className="close-btn" onClick={onClose}>✕</button>
-          <p>Error: {error || 'Movie not found'}</p>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+        <div className="glass-effect-dark p-12 rounded-2xl text-center relative" onClick={(e) => e.stopPropagation()}>
+          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors" onClick={onClose}>
+            <X size={20} />
+          </button>
+          <p className="text-red-400">Error: {error || 'Movie not found'}</p>
         </div>
       </div>
     );
@@ -61,92 +63,101 @@ const MovieDetails = ({ imdbId, onClose }) => {
   };
 
   return (
-    <div className="movie-details-modal" onClick={onClose}>
-      <div className="movie-details-content" onClick={(e) => e.stopPropagation()}>
-        <button className="close-btn" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="glass-effect-dark rounded-2xl max-w-6xl w-full my-8 relative" onClick={(e) => e.stopPropagation()}>
+        <button className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl flex items-center justify-center transition-colors z-10" onClick={onClose}>
+          <X size={24} />
+        </button>
         
-        <div className="movie-details-layout">
-          <div className="movie-poster-section">
+        <div className="flex flex-col md:flex-row gap-8 p-8">
+          <div className="flex-shrink-0">
             <img 
               src={posterUrl} 
               alt={movie.Title}
               onError={handleImageError}
+              className="w-full md:w-80 rounded-lg shadow-2xl"
             />
           </div>
 
-          <div className="movie-info-section">
-            <h1>{movie.Title}</h1>
-            <div className="movie-meta">
-              <span className="meta-item">{movie.Year}</span>
-              <span className="meta-separator">•</span>
-              <span className="meta-item">{movie.Rated}</span>
-              <span className="meta-separator">•</span>
-              <span className="meta-item">{movie.Runtime}</span>
+          <div className="flex-1">
+            <h1 className="text-4xl font-bold text-white mb-3">{movie.Title}</h1>
+            <div className="flex items-center gap-3 text-white/70 mb-4">
+              <span>{movie.Year}</span>
+              <span>•</span>
+              <span>{movie.Rated}</span>
+              <span>•</span>
+              <span>{movie.Runtime}</span>
             </div>
 
-            <div className="movie-genre">{movie.Genre}</div>
+            <div className="flex flex-wrap gap-2 mb-6">
+              {movie.Genre && movie.Genre.split(',').map((genre, idx) => (
+                <span key={idx} className="px-3 py-1 bg-white/10 text-white/80 rounded-full text-sm">{genre.trim()}</span>
+              ))}
+            </div>
 
-            <div className="movie-ratings">
+            <div className="flex flex-wrap gap-4 mb-6">
               {movie.Ratings && movie.Ratings.map((rating, index) => (
-                <div key={index} className="rating-item">
-                  <span className="rating-source">{rating.Source}</span>
-                  <span className="rating-value">{rating.Value}</span>
+                <div key={index} className="glass-effect px-4 py-2 rounded-lg">
+                  <div className="text-white/60 text-xs mb-1">{rating.Source}</div>
+                  <div className="text-white font-semibold">{rating.Value}</div>
                 </div>
               ))}
               {movie.imdbRating && (
-                <div className="rating-item highlight">
-                  <span className="rating-source">IMDb</span>
-                  <span className="rating-value">⭐ {movie.imdbRating}</span>
+                <div className="glass-effect px-4 py-2 rounded-lg border border-gold/30">
+                  <div className="text-gold-light text-xs mb-1">IMDb</div>
+                  <div className="text-white font-semibold flex items-center gap-1">
+                    <Star size={16} fill="#FFD700" className="text-yellow-400" /> {movie.imdbRating}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="movie-plot">
-              <h3>Plot</h3>
-              <p>{movie.Plot}</p>
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-white mb-2">Plot</h3>
+              <p className="text-white/70 leading-relaxed">{movie.Plot}</p>
             </div>
 
-            <div className="movie-details-grid">
-              <div className="detail-item">
-                <strong>Director:</strong>
-                <span>{movie.Director}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
+              <div>
+                <span className="text-white/60">Director: </span>
+                <span className="text-white">{movie.Director}</span>
               </div>
-              <div className="detail-item">
-                <strong>Actors:</strong>
-                <span>{movie.Actors}</span>
+              <div>
+                <span className="text-white/60">Actors: </span>
+                <span className="text-white">{movie.Actors}</span>
               </div>
-              <div className="detail-item">
-                <strong>Writers:</strong>
-                <span>{movie.Writer}</span>
+              <div>
+                <span className="text-white/60">Writers: </span>
+                <span className="text-white">{movie.Writer}</span>
               </div>
-              <div className="detail-item">
-                <strong>Language:</strong>
-                <span>{movie.Language}</span>
+              <div>
+                <span className="text-white/60">Language: </span>
+                <span className="text-white">{movie.Language}</span>
               </div>
-              <div className="detail-item">
-                <strong>Country:</strong>
-                <span>{movie.Country}</span>
+              <div>
+                <span className="text-white/60">Country: </span>
+                <span className="text-white">{movie.Country}</span>
               </div>
               {movie.Awards && movie.Awards !== 'N/A' && (
-                <div className="detail-item">
-                  <strong>Awards:</strong>
-                  <span>{movie.Awards}</span>
+                <div>
+                  <span className="text-white/60">Awards: </span>
+                  <span className="text-white">{movie.Awards}</span>
                 </div>
               )}
               {movie.BoxOffice && movie.BoxOffice !== 'N/A' && (
-                <div className="detail-item">
-                  <strong>Box Office:</strong>
-                  <span>{movie.BoxOffice}</span>
+                <div>
+                  <span className="text-white/60">Box Office: </span>
+                  <span className="text-white">{movie.BoxOffice}</span>
                 </div>
               )}
             </div>
 
-            <div className="action-buttons">
-              <button className="btn-primary">
-                <span>▶</span> Watch Now
+            <div className="flex gap-4">
+              <button className="px-8 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2">
+                <Play size={20} fill="currentColor" /> Watch Now
               </button>
-              <button className="btn-secondary">
-                <span>👥</span> Watch Together
+              <button className="px-8 py-3 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2">
+                <Users size={20} /> Watch Together
               </button>
             </div>
           </div>

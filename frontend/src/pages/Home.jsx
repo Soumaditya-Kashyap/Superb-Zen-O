@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Play, Users } from 'lucide-react';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
-import './Home.css';
 
 const Home = () => {
   const [movieCategories, setMovieCategories] = useState([]);
@@ -49,20 +49,23 @@ const Home = () => {
   };
 
   return (
-    <div className="home">
+    <div className="min-h-screen bg-black">
       {/* Hero Banner */}
-      <div className="hero-banner" style={{ backgroundImage: `url(${featuredContent.image})` }}>
-        <div className="hero-overlay">
-          <div className="hero-content">
-            <h1 className="hero-title">{featuredContent.title}</h1>
-            <p className="hero-meta">{featuredContent.description}</p>
-            <p className="hero-description">{featuredContent.tagline}</p>
-            <div className="hero-buttons">
-              <button className="btn-primary">
-                <span>▶</span> Browse Movies
+      <div 
+        className="relative h-[70vh] bg-cover bg-center"
+        style={{ backgroundImage: `url(${featuredContent.image})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent">
+          <div className="absolute bottom-0 left-0 right-0 px-10 pb-16">
+            <h1 className="text-7xl font-bold text-white mb-3">{featuredContent.title}</h1>
+            <p className="text-gold-light text-xl mb-2">{featuredContent.description}</p>
+            <p className="text-gray-300 text-lg max-w-2xl mb-8">{featuredContent.tagline}</p>
+            <div className="flex gap-4">
+              <button className="px-8 py-3.5 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2">
+                <Play size={20} fill="currentColor" /> Browse Movies
               </button>
-              <button className="btn-secondary">
-                <span>👥</span> Create Room
+              <button className="px-8 py-3.5 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2">
+                <Users size={20} /> Create Room
               </button>
             </div>
           </div>
@@ -70,27 +73,28 @@ const Home = () => {
       </div>
 
       {/* Content Sections */}
-      <div className="content-sections">
+      <div className="px-10 py-8">
         {loading ? (
-          <div className="loading-container">
+          <div className="flex flex-col items-center justify-center py-20">
             <div className="loading-spinner"></div>
-            <p>Loading movies...</p>
+            <p className="text-white/60 mt-4">Loading movies...</p>
           </div>
         ) : (
           movieCategories.map((category, idx) => (
-            <div key={idx} className="content-section">
-              <h2 className="section-title">{category.title}</h2>
-              <div className="movies-scroll">
+            <div key={idx} className="mb-12">
+              <h2 className="text-3xl font-bold text-white mb-6">{category.title}</h2>
+              <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gold/30 scrollbar-track-transparent">
                 {category.movies && category.movies.length > 0 ? (
                   category.movies.map((movie) => (
-                    <MovieCard 
-                      key={movie.imdbID} 
-                      movie={movie} 
-                      onClick={handleMovieClick}
-                    />
+                    <div key={movie.imdbID} className="flex-none w-[220px]">
+                      <MovieCard 
+                        movie={movie} 
+                        onClick={handleMovieClick}
+                      />
+                    </div>
                   ))
                 ) : (
-                  <p className="no-movies">No movies available</p>
+                  <p className="text-white/60">No movies available</p>
                 )}
               </div>
             </div>
@@ -98,7 +102,6 @@ const Home = () => {
         )}
       </div>
 
-      {/* Movie Details Modal */}
       {selectedMovie && (
         <MovieDetails 
           imdbId={selectedMovie} 

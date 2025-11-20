@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import './Auth.css';
 
 const Auth = ({ setIsAuthenticated }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -109,16 +108,22 @@ const Auth = ({ setIsAuthenticated }) => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-box">
-        <div className="auth-header">
-          <h1 className="auth-logo">SUPERB</h1>
-          <p className="auth-tagline">Watch Together, Anywhere</p>
+    <div className="min-h-screen flex justify-center items-center bg-gradient-to-br from-black via-gray-900 to-black p-5">
+      <div className="w-full max-w-md glass-effect-dark rounded-3xl p-10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-bold text-gold-gradient mb-2.5 tracking-[4px]">
+            SUPERB
+          </h1>
+          <p className="text-white/60 text-sm tracking-wider">Watch Together, Anywhere</p>
         </div>
 
-        <div className="auth-tabs">
+        <div className="flex gap-2.5 mb-8 bg-white/5 p-1.5 rounded-xl">
           <button
-            className={`auth-tab ${isLogin ? 'active' : ''}`}
+            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium cursor-pointer transition-all duration-300 ${
+              isLogin 
+                ? 'bg-gradient-to-br from-gold to-gold-light text-black font-semibold' 
+                : 'bg-transparent text-white/60 hover:bg-white/10 hover:text-white'
+            }`}
             onClick={() => {
               setIsLogin(true);
               setError('');
@@ -128,7 +133,11 @@ const Auth = ({ setIsAuthenticated }) => {
             Login
           </button>
           <button
-            className={`auth-tab ${!isLogin ? 'active' : ''}`}
+            className={`flex-1 py-3 px-4 rounded-lg text-base font-medium cursor-pointer transition-all duration-300 ${
+              !isLogin 
+                ? 'bg-gradient-to-br from-gold to-gold-light text-black font-semibold' 
+                : 'bg-transparent text-white/60 hover:bg-white/10 hover:text-white'
+            }`}
             onClick={() => {
               setIsLogin(false);
               setError('');
@@ -139,13 +148,21 @@ const Auth = ({ setIsAuthenticated }) => {
           </button>
         </div>
 
-        {error && <div className="auth-message error">{error}</div>}
-        {success && <div className="auth-message success">{success}</div>}
+        {error && (
+          <div className="px-4 py-3 rounded-xl text-sm text-center mb-5 font-medium bg-red-500/10 border border-red-500/30 text-red-400">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="px-4 py-3 rounded-xl text-sm text-center mb-5 font-medium bg-green-500/10 border border-green-500/30 text-green-400">
+            {success}
+          </div>
+        )}
 
         {isLogin ? (
-          <form onSubmit={handleLogin} className="auth-form">
-            <div className="form-group">
-              <label>Email</label>
+          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Email</label>
               <input
                 type="email"
                 name="email"
@@ -153,11 +170,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleLoginChange}
                 required
                 placeholder="Enter your email"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Password</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Password</label>
               <input
                 type="password"
                 name="password"
@@ -165,17 +183,22 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleLoginChange}
                 required
                 placeholder="Enter your password"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <button type="submit" className="auth-submit" disabled={loading}>
+            <button 
+              type="submit" 
+              className="py-3.5 px-4 bg-gradient-to-br from-gold to-gold-light border-none rounded-xl text-black text-base font-semibold cursor-pointer transition-all duration-300 mt-2.5 tracking-wider hover:translate-y-[-2px] hover:shadow-[0_6px_20px_rgba(212,175,55,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleRegister} className="auth-form">
-            <div className="form-group">
-              <label>Full Name</label>
+          <form onSubmit={handleRegister} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Full Name</label>
               <input
                 type="text"
                 name="name"
@@ -183,11 +206,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleRegisterChange}
                 required
                 placeholder="Enter your full name"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Email</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Email</label>
               <input
                 type="email"
                 name="email"
@@ -195,11 +219,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleRegisterChange}
                 required
                 placeholder="Enter your email"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Nickname</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Nickname</label>
               <input
                 type="text"
                 name="nickName"
@@ -207,11 +232,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleRegisterChange}
                 required
                 placeholder="Choose a nickname"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Phone Number</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Phone Number</label>
               <input
                 type="tel"
                 name="phone"
@@ -219,11 +245,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 onChange={handleRegisterChange}
                 required
                 placeholder="Enter your phone number"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Password</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Password</label>
               <input
                 type="password"
                 name="password"
@@ -232,11 +259,12 @@ const Auth = ({ setIsAuthenticated }) => {
                 required
                 minLength={6}
                 placeholder="Create a password (min 6 characters)"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <div className="form-group">
-              <label>Confirm Password</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-gold text-sm font-medium tracking-wider">Confirm Password</label>
               <input
                 type="password"
                 name="confirmPassword"
@@ -245,10 +273,15 @@ const Auth = ({ setIsAuthenticated }) => {
                 required
                 minLength={6}
                 placeholder="Confirm your password"
+                className="py-3.5 px-4 bg-white/5 border border-gold/20 rounded-xl text-white text-[15px] transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8 focus:shadow-[0_0_0_3px_rgba(212,175,55,0.1)] placeholder:text-white/30"
               />
             </div>
 
-            <button type="submit" className="auth-submit" disabled={loading}>
+            <button 
+              type="submit" 
+              className="py-3.5 px-4 bg-gradient-to-br from-gold to-gold-light border-none rounded-xl text-black text-base font-semibold cursor-pointer transition-all duration-300 mt-2.5 tracking-wider hover:translate-y-[-2px] hover:shadow-[0_6px_20px_rgba(212,175,55,0.4)] disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? 'Creating account...' : 'Sign Up'}
             </button>
           </form>

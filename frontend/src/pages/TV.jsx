@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
-import './TV.css';
 
 const TV = () => {
   const [shows, setShows] = useState([]);
@@ -36,34 +35,31 @@ const TV = () => {
   };
 
   return (
-    <div className="tv-page">
-      <div className="page-header">
-        <h1>TV Shows</h1>
-        <p>Binge-watch your favorite series together</p>
+    <div className="px-10 py-10 min-h-screen bg-black">
+      <div className="mb-10">
+        <h1 className="text-5xl font-bold text-white mb-2">TV Shows</h1>
+        <p className="text-gray-400 text-lg">Binge-watch your favorite series together</p>
       </div>
 
       {loading ? (
-        <div className="loading-container">
+        <div className="flex flex-col items-center justify-center py-20">
           <div className="loading-spinner"></div>
-          <p>Loading TV shows...</p>
+          <p className="text-white/60 mt-4">Loading TV shows...</p>
         </div>
       ) : (
-        <div className="shows-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {shows.length > 0 ? (
             shows.map((show) => (
-              <div key={show.imdbID} className="show-card-wrapper">
-                <MovieCard movie={show} onClick={handleShowClick} />
-              </div>
+              <MovieCard key={show.imdbID} movie={show} onClick={handleShowClick} />
             ))
           ) : (
-            <div className="no-shows">
-              <p>No TV shows available</p>
+            <div className="col-span-full text-center py-20">
+              <p className="text-white/60 text-lg">No TV shows available</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Show Details Modal */}
       {selectedShow && (
         <MovieDetails 
           imdbId={selectedShow} 
