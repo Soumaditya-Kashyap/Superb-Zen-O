@@ -13,6 +13,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 15px;
+  position: relative;
 }
 
 .profile-avatar {
@@ -29,6 +30,10 @@
   box-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
 }
 
+.profile-info {
+  flex: 1;
+}
+
 .profile-info h1 {
   font-size: 2.5rem;
   font-weight: 700;
@@ -36,10 +41,49 @@
   margin: 0 0 10px 0;
 }
 
-.profile-info p {
+.profile-nickname {
+  font-size: 1.2rem;
+  color: #D4AF37 !important;
+  font-weight: 500;
+  margin: 5px 0 !important;
+}
+
+.profile-email {
   font-size: 1rem;
-  color: #888888;
-  margin: 0;
+  color: #aaaaaa !important;
+  margin: 5px 0 !important;
+}
+
+.profile-member {
+  font-size: 0.9rem;
+  color: #888888 !important;
+  margin: 8px 0 0 0 !important;
+}
+
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 10px;
+  color: #ff6b6b;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.3) 100%);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+}
+
+.logout-button .logout-icon {
+  font-size: 20px;
 }
 
 .space-section {

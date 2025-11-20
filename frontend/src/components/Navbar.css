@@ -27,6 +27,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 20px;
 }
 
 .logo-icon {
@@ -40,6 +43,8 @@
   padding: 0;
   margin: 0;
   width: 100%;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .navbar-menu li {
@@ -98,6 +103,20 @@
 }
 
 .navbar:hover .nav-label {
+  opacity: 1;
+}
+
+.navbar-brand {
+  margin-left: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #D4AF37;
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+
+.navbar:hover .navbar-brand {
   opacity: 1;
 }
 
