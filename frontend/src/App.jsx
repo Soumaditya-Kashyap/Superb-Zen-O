@@ -9,7 +9,8 @@ import Sports from './pages/Sports';
 import Sparks from './pages/Sparks';
 import Categories from './pages/Categories';
 import MySpace from './pages/MySpace';
-import Auth from './pages/Auth';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 
 // Protected Route Component
 function ProtectedRoute({ children, setIsAuthenticated }) {
@@ -90,7 +91,10 @@ function AppContent() {
       <main className={isAuthenticated ? "flex-1 ml-20 w-[calc(100%-5rem)] bg-black" : "w-full flex justify-center items-center"}>
         <Routes>
           <Route path="/auth" element={
-            isAuthenticated ? <Navigate to="/" replace /> : <Auth setIsAuthenticated={setIsAuthenticated} />
+            isAuthenticated ? <Navigate to="/" replace /> : <Login setIsAuthenticated={setIsAuthenticated} />
+          } />
+          <Route path="/signup" element={
+            isAuthenticated ? <Navigate to="/" replace /> : <Signup setIsAuthenticated={setIsAuthenticated} />
           } />
           <Route path="/" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Home /></ProtectedRoute>

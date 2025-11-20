@@ -10,6 +10,16 @@
   #root {
     @apply min-h-screen w-full;
   }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Hardware acceleration for animations */
+  .will-change-transform {
+    will-change: transform;
+  }
 }
 
 @layer components {

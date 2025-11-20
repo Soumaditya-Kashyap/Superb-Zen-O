@@ -23,18 +23,24 @@ const setTokenCookie = (res, token) => {
 
 exports.register = async (req, res) => {
     try {
-        const { name, email, nickName, phone, password, confirmPassword } = req.body;
+        const { name, email, nickName, phone, password, confirmPassword, languages, genres } = req.body;
+        
+        console.log('📝 New registration attempt for:', email);
+        console.log('👤 NickName:', nickName);
+        console.log('🌍 Languages:', languages);
+        console.log('🎬 Genres:', genres);
 
         // Validate required fields
-        if (!name || !email || !nickName || !phone || !password || !confirmPassword) {
+        if (!name || !email || !nickName || !phone || !password) {
+            console.log('❌ Registration failed: Missing required fields');
             return res.status(400).json({ 
                 success: false,
                 message: "All fields are required" 
             });
         }
 
-        // Validate password match
-        if (password !== confirmPassword) {
+        // Validate password match if confirmPassword is provided
+        if (confirmPassword && password !== confirmPassword) {
             return res.status(400).json({ 
                 success: false,
                 message: "Passwords do not match" 
@@ -68,6 +74,10 @@ exports.register = async (req, res) => {
             nickName,
             phone,
             password: hashedPassword,
+            preferences: {
+                languages: languages || [],
+                genres: genres || []
+            }
         });
 
         // Generate token
@@ -75,6 +85,9 @@ exports.register = async (req, res) => {
         
         // Set cookie
         setTokenCookie(res, token);
+        
+        console.log('✅ User registered successfully:', user.email);
+        console.log('🎉 Preferences saved:', { languages: user.preferences.languages, genres: user.preferences.genres });
 
         return res.status(201).json({
             success: true,
@@ -86,7 +99,8 @@ exports.register = async (req, res) => {
                 email: user.email,
                 nickName: user.nickName,
                 phone: user.phone,
-                role: user.role
+                role: user.role,
+                preferences: user.preferences
             }
         });
 
@@ -100,13 +114,89 @@ exports.register = async (req, res) => {
     }
 };
 
+// Get user preferences
+exports.getPreferences = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log('📋 Fetching preferences for user:', userId);
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+        
+        console.log('✅ Preferences found:', user.preferences);
+
+        res.status(200).json({
+            success: true,
+            preferences: user.preferences || { languages: [], genres: [] }
+        });
+
+    } catch (error) {
+        console.error('Get preferences error:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching preferences",
+            error: error.message
+        });
+    }
+};
+
+// Update user preferences
+exports.updatePreferences = async (req, res) => {
+    try {
+        const { languages, genres } = req.body;
+        const userId = req.user.id;
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    'preferences.languages': languages || [],
+                    'preferences.genres': genres || []
+                }
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Preferences updated successfully",
+            preferences: user.preferences
+        });
+
+    } catch (error) {
+        console.error('Update preferences error:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Error updating preferences",
+            error: error.message
+        });
+    }
+};
+
 
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        
+        console.log('🔐 Login attempt for:', email);
 
         // Validate input
         if (!email || !password) {
+            console.log('❌ Login failed: Missing credentials');
             return res.status(400).json({ 
                 success: false,
                 message: "Email and password are required" 
@@ -136,6 +226,9 @@ exports.login = async (req, res) => {
         
         // Set cookie
         setTokenCookie(res, token);
+        
+        console.log('✅ Login successful for:', user.email);
+        console.log('👤 Welcome back,', user.nickName);
 
         res.status(200).json({
             success: true,
@@ -183,7 +276,8 @@ exports.getCurrentUser = async (req, res) => {
                 phone: user.phone,
                 role: user.role,
                 profilePicture: user.profilePicture,
-                createdAt: user.createdAt
+                createdAt: user.createdAt,
+                preferences: user.preferences || { languages: [], genres: [] }
             }
         });
 
