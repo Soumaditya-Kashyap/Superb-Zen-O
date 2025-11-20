@@ -1,9 +1,38 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdLogout, MdAccountCircle } from 'react-icons/md';
 
 const MySpace = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || '{}'));
+
+  // Fetch latest user data with preferences
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const response = await fetch('http://localhost:5000/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        });
+
+        const data = await response.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+          // Update localStorage with latest data
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   const watchHistory = [
     { id: 1, title: "The Dark Knight", progress: 75, thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=200&fit=crop" },
@@ -57,6 +86,35 @@ const MySpace = () => {
             <p className="text-gold-light text-lg mb-1">@{user.nickName || 'username'}</p>
             <p className="text-white/60">{user.email || 'email@example.com'}</p>
             <p className="text-white/40 text-sm mt-2">Member since {formatDate(user.createdAt)}</p>
+            
+            {user.preferences && (user.preferences.genres?.length > 0 || user.preferences.languages?.length > 0) && (
+              <div className="mt-4 space-y-2">
+                {user.preferences.genres?.length > 0 && (
+                  <div>
+                    <p className="text-white/60 text-sm mb-1">Favorite Genres:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {user.preferences.genres.map((genre, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-gold/20 text-gold border border-gold/30 rounded-full text-xs font-medium capitalize">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {user.preferences.languages?.length > 0 && (
+                  <div>
+                    <p className="text-white/60 text-sm mb-1">Languages:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {user.preferences.languages.map((lang, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-white/10 text-white/80 border border-white/20 rounded-full text-xs font-medium capitalize">
+                          {lang}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <button 
