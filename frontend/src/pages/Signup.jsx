@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { motion, AnimatePresence } from 'framer-motion';
+import {  AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Phone, Eye, EyeOff, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 const Signup = ({ setIsAuthenticated }) => {
@@ -187,7 +187,6 @@ const Signup = ({ setIsAuthenticated }) => {
   const isFullScreen = currentStep === 4 || currentStep === 5;
 
   const renderStep = () => {
-    const stepTransition = 'transition-all duration-500 ease-in-out';
 
     switch (currentStep) {
       case 1:
