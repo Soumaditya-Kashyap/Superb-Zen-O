@@ -2,12 +2,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-import Search from './pages/Search';
-import TV from './pages/TV';
-import Movies from './pages/Movies';
-import Sports from './pages/Sports';
+import WatchTogether from './pages/WatchTogether';
+import Chat from './pages/Chat';
+import Live from './pages/Live';
 import Sparks from './pages/Sparks';
 import Categories from './pages/Categories';
+import MusicPage from './pages/MusicPage';
+import Support from './pages/Support';
+import SettingsPage from './pages/SettingsPage';
 import MySpace from './pages/MySpace';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -99,23 +101,29 @@ function AppContent() {
           <Route path="/" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Home /></ProtectedRoute>
           } />
-          <Route path="/search" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Search /></ProtectedRoute>
+          <Route path="/watch-together" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><WatchTogether /></ProtectedRoute>
           } />
-          <Route path="/tv" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><TV /></ProtectedRoute>
+          <Route path="/chat" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Chat /></ProtectedRoute>
           } />
-          <Route path="/movies" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Movies /></ProtectedRoute>
+          <Route path="/live" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Live /></ProtectedRoute>
           } />
-          <Route path="/sports" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Sports /></ProtectedRoute>
+          <Route path="/categories" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Categories /></ProtectedRoute>
           } />
           <Route path="/sparks" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Sparks /></ProtectedRoute>
           } />
-          <Route path="/categories" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Categories /></ProtectedRoute>
+          <Route path="/music" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><MusicPage /></ProtectedRoute>
+          } />
+          <Route path="/support" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Support /></ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><SettingsPage /></ProtectedRoute>
           } />
           <Route path="/myspace" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><MySpace /></ProtectedRoute>

@@ -1,23 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Play, Users, Sparkles, TrendingUp, Star, Heart, ArrowUp, Globe } from 'lucide-react';
+import { 
+  Search,
+  Bell,
+  ChevronDown,
+  Film,
+  ArrowUp,
+  Sparkles,
+  Star,
+  Globe,
+  TrendingUp,
+  Heart
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
 
 const Home = () => {
+  const navigate = useNavigate();
   const [movieCategories, setMovieCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState(null);
-  const [userPreferences, setUserPreferences] = useState(null);
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState('User');
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [featuredContent] = useState({
-    title: "Watch Together",
-    description: "2025 • Stream & Connect",
-    tagline: "Experience movies with friends in real-time. Synchronized playback, video calls, and live chat.",
-    image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200&h=600&fit=crop"
-  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('Movies');
 
   useEffect(() => {
     const fetchPersonalizedMovies = async () => {
@@ -199,55 +207,69 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Hero Banner */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className="relative h-[65vh] bg-cover bg-center"
-        style={{ backgroundImage: `url(${featuredContent.image})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent">
-          <div className="absolute bottom-0 left-0 right-0 px-10 pb-16">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-            >
-              {userName && (
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="text-gold" size={20} />
-                  <p className="text-gold text-xl font-medium">Welcome back, {userName}!</p>
-                </div>
-              )}
-              <h1 className="text-7xl font-bold text-white mb-3 bg-gradient-to-r from-white to-white/80 bg-clip-text">
-                {featuredContent.title}
-              </h1>
-              <p className="text-gold-light text-xl mb-2">{featuredContent.description}</p>
-              <p className="text-gray-300 text-lg max-w-2xl mb-8">{featuredContent.tagline}</p>
-              <div className="flex gap-4">
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-8 py-3.5 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg flex items-center gap-2 shadow-lg shadow-gold/20"
-                >
-                  <Play size={20} fill="currentColor" /> Browse Movies
-                </motion.button>
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-8 py-3.5 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
-                >
-                  <Users size={20} /> Create Room
-                </motion.button>
+      {/* Main Content Area */}
+      <div className="flex-1 ml-20">
+        {/* Top Navigation Bar */}
+        <div className="fixed top-0 right-0 left-20 h-20 bg-gradient-to-r from-black/60 via-black/50 to-black/60 backdrop-blur-2xl border-b border-gold/20 z-40 shadow-lg shadow-black/20">
+          <div className="h-full px-8 flex items-center justify-between gap-6">
+            {/* Filter Dropdown */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <button className="flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-gold/15 to-gold-light/10 hover:from-gold/20 hover:to-gold-light/15 rounded-xl border border-gold/30 transition-all shadow-lg shadow-gold/10">
+                  <Film size={20} className="text-gold" />
+                  <span className="text-white text-sm font-semibold">{filterType}</span>
+                  <ChevronDown size={18} className="text-gold/60" />
+                </button>
               </div>
-            </motion.div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="flex-1 max-w-2xl">
+              <div className="relative group">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gold/50 group-hover:text-gold transition-colors" size={22} />
+                <input
+                  type="text"
+                  placeholder="Search movies, series, shows..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-gold/20 rounded-2xl py-3.5 pl-14 pr-6 text-white placeholder-white/40 focus:outline-none focus:border-gold/50 focus:bg-white/10 transition-all shadow-inner font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Right Actions */}
+            <div className="flex items-center gap-4">
+              {/* Notifications */}
+              <motion.button
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                whileTap={{ scale: 0.9 }}
+                className="relative p-3 bg-gradient-to-br from-gold/15 to-gold-light/10 hover:from-gold/20 hover:to-gold-light/15 rounded-xl border border-gold/30 transition-all shadow-lg shadow-gold/10"
+              >
+                <Bell size={22} className="text-gold" />
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"></span>
+              </motion.button>
+
+              {/* User Profile */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate('/myspace')}
+                className="flex items-center gap-3 px-5 py-2.5 bg-gradient-to-r from-gold/15 to-gold-light/10 hover:from-gold/20 hover:to-gold-light/15 rounded-xl border border-gold/30 transition-all shadow-lg shadow-gold/10"
+              >
+                <div className="w-9 h-9 bg-gradient-to-br from-gold to-gold-light rounded-full flex items-center justify-center shadow-lg shadow-gold/30">
+                  <span className="text-black font-bold text-base">{userName.charAt(0).toUpperCase()}</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-white text-sm font-bold">{userName}</p>
+                  <p className="text-gold text-xs font-semibold">Premium ✦</p>
+                </div>
+              </motion.button>
+            </div>
           </div>
         </div>
-      </motion.div>
 
-      {/* Content Sections */}
-      <div className="px-10 py-8 space-y-10">
+        {/* Movie Content */}
+        <div className="pt-20 px-8 py-8">
         {loading ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -375,6 +397,7 @@ const Home = () => {
         )}
       </div>
 
+      {/* Movie Details Modal */}
       {selectedMovie && (
         <MovieDetails 
           imdbId={selectedMovie} 
@@ -398,6 +421,7 @@ const Home = () => {
           </motion.button>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 };
