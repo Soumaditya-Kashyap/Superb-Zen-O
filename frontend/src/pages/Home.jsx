@@ -26,6 +26,44 @@ const Home = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('Movies');
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Hero carousel data
+  const heroSlides = [
+      {
+      id: 1,
+      title: "Roi Roi Binale",
+      subtitle: "The Ultimate Showdown",
+      description: "An action-packed thriller that keeps you on the edge",
+      image: "/images/movie-posters/roiroibinale.png",
+      tags: ["2h 15min", "Action", "Movie", "2025", "13+"]
+    },
+    {
+      id: 2,
+      title: "How to Train Your Dragon",
+      subtitle: "The Final Chapter",
+      description: "Experience the epic conclusion of the beloved trilogy",
+      image: "/images/movie-posters/image.png",
+      tags: ["1h 56min", "Action", "Movie", "2025", "6+"]
+    },
+    {
+      id: 3,
+      title: "Padmavat",
+      subtitle: "A Royal Saga",
+      description: "Witness the legendary tale of honor and sacrifice",
+      image: "/images/movie-posters/padmavat.png",
+      tags: ["2h 44min", "Drama", "Movie", "2018", "13+"]
+    }
+  ];
+
+  // Auto-play carousel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 5000); // Change slide every 5 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchPersonalizedMovies = async () => {
@@ -208,7 +246,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-black">
       {/* Main Content Area */}
-      <div className="flex-1 ml-20">
+      <div>
         {/* Top Navigation Bar */}
         <div className="fixed top-0 right-0 left-20 h-20 bg-gradient-to-r from-black/60 via-black/50 to-black/60 backdrop-blur-2xl border-b border-gold/20 z-40 shadow-lg shadow-black/20">
           <div className="h-full px-8 flex items-center justify-between gap-6">
@@ -268,8 +306,156 @@ const Home = () => {
           </div>
         </div>
 
+        {/* Hero Carousel Section */}
+        <div className="pt-28 px-8 pb-4">
+          <div className="relative h-[520px] group">
+            {/* Slides */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.6, ease: "easeInOut" }}
+                className="absolute inset-0"
+              >
+                {/* Glassmorphic Frame Container */}
+                <div className="relative h-full w-full rounded-3xl overflow-hidden bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl border-4 border-white/20 shadow-2xl">
+                  {/* Movie Poster - Full visibility */}
+                  <div className="absolute inset-0">
+                    <img 
+                      src={heroSlides[currentSlide].image}
+                      alt={heroSlides[currentSlide].title}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Subtle gradient only at bottom for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                  </div>
+
+                  {/* Content positioned at bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 p-10 pb-12">
+                    <div className="max-w-3xl space-y-4">
+                      {/* Tags */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex items-center gap-2 flex-wrap"
+                      >
+                        {heroSlides[currentSlide].tags.map((tag, index) => (
+                          <span 
+                            key={index}
+                            className="px-3 py-1 bg-white/15 backdrop-blur-md border border-white/30 rounded-lg text-white text-xs font-semibold"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </motion.div>
+
+                      {/* Title - Smaller and cleaner */}
+                      <motion.h1 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-5xl font-bold text-white leading-tight drop-shadow-2xl"
+                      >
+                        {heroSlides[currentSlide].title}
+                      </motion.h1>
+
+                      {/* Subtitle */}
+                      <motion.p 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="text-xl font-medium text-gold"
+                      >
+                        {heroSlides[currentSlide].subtitle}
+                      </motion.p>
+
+                      {/* Description */}
+                      <motion.p 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="text-base text-white/90 leading-relaxed max-w-2xl"
+                      >
+                        {heroSlides[currentSlide].description}
+                      </motion.p>
+
+                      {/* Buttons */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 }}
+                        className="flex items-center gap-3 pt-2"
+                      >
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold text-base rounded-xl shadow-lg shadow-gold/40 hover:shadow-gold/60 transition-all flex items-center gap-2"
+                        >
+                          <Film size={18} />
+                          Watch Now
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-6 py-3 bg-white/15 backdrop-blur-md border-2 border-white/30 text-white font-semibold text-base rounded-xl hover:bg-white/25 transition-all flex items-center gap-2"
+                        >
+                          <Heart size={18} />
+                          Add to Favorites
+                        </motion.button>
+                      </motion.div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Navigation Dots */}
+            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+              {heroSlides.map((_, index) => (
+                <motion.button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                  className={`transition-all duration-500 rounded-full ${
+                    index === currentSlide
+                      ? 'w-10 h-2.5 bg-gradient-to-r from-gold to-gold-light shadow-md shadow-gold/50'
+                      : 'w-2.5 h-2.5 bg-white/30 hover:bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Navigation Arrows */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
+              className="absolute -left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            >
+              <ChevronDown size={24} className="rotate-90" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setCurrentSlide((prev) => (prev + 1) % heroSlides.length)}
+              className="absolute -right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            >
+              <ChevronDown size={24} className="-rotate-90" />
+            </motion.button>
+
+            {/* Slide Counter */}
+            <div className="absolute top-4 right-4 px-3 py-1.5 bg-black/50 backdrop-blur-md border border-white/20 rounded-lg text-white text-sm font-bold z-20">
+              {currentSlide + 1} / {heroSlides.length}
+            </div>
+          </div>
+        </div>
+
         {/* Movie Content */}
-        <div className="pt-20 px-8 py-8">
+        <div className="px-8 py-8">
         {loading ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
