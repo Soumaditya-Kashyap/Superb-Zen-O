@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
+import WatchModeModal from '../components/WatchModeModal';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('Movies');
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showHeroWatchModal, setShowHeroWatchModal] = useState(false);
+  const [selectedHeroMovie, setSelectedHeroMovie] = useState(null);
 
   // Hero carousel data
   const heroSlides = [
@@ -36,7 +39,8 @@ const Home = () => {
       subtitle: "The Ultimate Showdown",
       description: "An action-packed thriller that keeps you on the edge",
       image: "/images/movie-posters/roiroibinale.png",
-      tags: ["2h 15min", "Action", "Movie", "2025", "13+"]
+      tags: ["2h 15min", "Action", "Movie", "2025", "13+"],
+      imdbID: "tt1234567" // Placeholder ID for hero movies without IMDb
     },
     {
       id: 2,
@@ -44,7 +48,8 @@ const Home = () => {
       subtitle: "The Final Chapter",
       description: "Experience the epic conclusion of the beloved trilogy",
       image: "/images/movie-posters/image.png",
-      tags: ["1h 56min", "Action", "Movie", "2025", "6+"]
+      tags: ["1h 56min", "Action", "Movie", "2025", "6+"],
+      imdbID: "tt2386490"
     },
     {
       id: 3,
@@ -52,7 +57,8 @@ const Home = () => {
       subtitle: "A Royal Saga",
       description: "Witness the legendary tale of honor and sacrifice",
       image: "/images/movie-posters/padmavat.png",
-      tags: ["2h 44min", "Drama", "Movie", "2018", "13+"]
+      tags: ["2h 44min", "Drama", "Movie", "2018", "13+"],
+      imdbID: "tt5935704"
     }
   ];
 
@@ -243,6 +249,20 @@ const Home = () => {
     setSelectedMovie(null);
   };
 
+  const handleHeroWatchNow = (slide) => {
+    setSelectedHeroMovie(slide);
+    setShowHeroWatchModal(true);
+  };
+
+  const handleHeroWatchMode = (mode) => {
+    setShowHeroWatchModal(false);
+    if (mode === 'alone' && selectedHeroMovie) {
+      navigate(`/player/${selectedHeroMovie.imdbID}`);
+    } else {
+      alert('Watch Together feature coming soon!');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black">
       {/* Main Content Area */}
@@ -392,6 +412,7 @@ const Home = () => {
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
+                          onClick={() => handleHeroWatchNow(heroSlides[currentSlide])}
                           className="px-6 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold text-base rounded-xl shadow-lg shadow-gold/40 hover:shadow-gold/60 transition-all flex items-center gap-2"
                         >
                           <Film size={18} />
@@ -590,6 +611,14 @@ const Home = () => {
           onClose={handleCloseDetails}
         />
       )}
+
+      {/* Hero Watch Mode Modal */}
+      <WatchModeModal 
+        isOpen={showHeroWatchModal}
+        onClose={() => setShowHeroWatchModal(false)}
+        onSelectMode={handleHeroWatchMode}
+        movieTitle={selectedHeroMovie?.title || ''}
+      />
 
       {/* Scroll to Top Button */}
       <AnimatePresence>

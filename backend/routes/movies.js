@@ -9,6 +9,10 @@ router.get('/search', movieController.searchMovies);
 // Get personalized movies (must be before /:id route)
 router.get('/personalized', authMiddleware, movieController.getPersonalizedMovies);
 
+// Favorites
+router.post('/favorite', authMiddleware, movieController.toggleFavorite);
+router.get('/favorites/list', authMiddleware, movieController.getFavorites);
+
 // Get movie by ID
 router.get('/:id', movieController.getMovieById);
 

@@ -11,6 +11,7 @@ import MusicPage from './pages/MusicPage';
 import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
 import MySpace from './pages/MySpace';
+import MoviePlayer from './pages/MoviePlayer';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
@@ -127,6 +128,9 @@ function AppContent() {
           } />
           <Route path="/myspace" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><MySpace /></ProtectedRoute>
+          } />
+          <Route path="/player/:imdbId" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><MoviePlayer /></ProtectedRoute>
           } />
           <Route path="*" element={
             <Navigate to={isAuthenticated ? "/" : "/auth"} replace />
