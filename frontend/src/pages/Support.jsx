@@ -1,0 +1,17 @@
+const Support = () => {
+  return (
+    <div className="min-h-screen p-10">
+      <div className="flex flex-col items-center justify-center min-h-[80vh]">
+        <div className="text-center">
+          <h1 className="text-6xl font-bold text-white mb-6">Support</h1>
+          <p className="text-2xl text-gold mb-4">Coming Soon</p>
+          <p className="text-gray-400 text-lg max-w-2xl">
+            This feature will be developed in the next phase. Get help and support for any issues!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Support;

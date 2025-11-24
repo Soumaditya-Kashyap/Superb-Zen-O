@@ -4,30 +4,40 @@ const Movie = require('../models/movie');
 // Get API key dynamically
 const getApiKey = () => process.env.OMDB_API_KEY;
 
-// Genre mapping with multiple search terms for better coverage
+// Genre mapping - ONLY these 8 categories as per requirements
 const GENRE_SEARCH_TERMS = {
     action: ['action', 'mission', 'war', 'fight', 'assassin', 'agent', 'soldier', 'combat', 'battle', 'spy'],
-    romance: ['love', 'romance', 'wedding', 'romantic', 'heart', 'couple', 'affair', 'passion', 'relationship', 'valentine'],
     comedy: ['comedy', 'funny', 'humor', 'laugh', 'hilarious', 'fun', 'silly', 'joke', 'parody', 'crazy'],
-    thriller: ['thriller', 'suspense', 'tension', 'edge', 'dark', 'psychological', 'intense', 'dangerous', 'escape', 'chase'],
-    horror: ['horror', 'scary', 'terror', 'nightmare', 'ghost', 'evil', 'dead', 'zombie', 'vampire', 'demon'],
-    scifi: ['space', 'future', 'alien', 'robot', 'time', 'galaxy', 'planet', 'science', 'star', 'universe'],
     drama: ['life', 'story', 'truth', 'family', 'human', 'real', 'american', 'last', 'man', 'girl'],
-    animation: ['animation', 'animated', 'cartoon', 'pixar', 'disney', 'dreamworks', 'kids', 'toy', 'monster', 'princess'],
-    documentary: ['documentary', 'true', 'history', 'world', 'america', 'war', 'life', 'story', 'planet', 'earth'],
-    fantasy: ['magic', 'wizard', 'dragon', 'fantasy', 'kingdom', 'quest', 'sword', 'legend', 'mythical', 'adventure'],
-    mystery: ['mystery', 'detective', 'murder', 'investigation', 'crime', 'case', 'clue', 'suspect', 'killer', 'secret'],
-    family: ['family', 'kids', 'children', 'adventure', 'journey', 'home', 'hero', 'friend', 'dog', 'christmas']
+    horror: ['horror', 'scary', 'terror', 'nightmare', 'ghost', 'evil', 'dead', 'zombie', 'vampire', 'demon'],
+    romance: ['love', 'romance', 'wedding', 'romantic', 'heart', 'couple', 'affair', 'passion', 'relationship', 'valentine'],
+    scifi: ['space', 'future', 'alien', 'robot', 'time', 'galaxy', 'planet', 'science', 'star', 'universe'],
+    thriller: ['thriller', 'suspense', 'tension', 'edge', 'dark', 'psychological', 'intense', 'dangerous', 'escape', 'chase'],
+    documentary: ['documentary', 'true', 'history', 'world', 'america', 'war', 'life', 'story', 'planet', 'earth']
 };
 
-// Indian language search terms
+// Language search terms - ONLY these 20 languages as per requirements
 const LANGUAGE_SEARCH_TERMS = {
     hindi: ['shah rukh', 'salman', 'aamir', 'hrithik', 'akshay', 'khan', 'kapoor', 'kumar', 'bachchan', 'bollywood'],
     tamil: ['rajinikanth', 'kamal', 'vijay', 'ajith', 'suriya', 'dhanush', 'kollywood', 'tamil', 'chennai', 'madras'],
     telugu: ['mahesh', 'prabhas', 'allu', 'ram', 'jr ntr', 'nagarjuna', 'tollywood', 'telugu', 'hyderabad', 'bahubali'],
-    malayalam: ['mohanlal', 'mammootty', 'fahadh', 'prithviraj', 'nivin', 'dulquer', 'malayalam', 'kerala', 'mollywood', 'kochi'],
+    bengali: ['uttam', 'satyajit', 'bengali', 'kolkata', 'calcutta', 'bengal', 'prosenjit', 'dev', 'tollygunge', 'tollywood'],
+    marathi: ['marathi', 'mumbai', 'pune', 'maharashtra', 'maratha', 'sairat', 'natsamrat', 'shwaas'],
+    gujarati: ['gujarati', 'gujarat', 'ahmedabad', 'surat', 'dhollywood', 'gujju'],
     kannada: ['yash', 'sudeep', 'puneeth', 'upendra', 'darshan', 'sandalwood', 'kannada', 'karnataka', 'bangalore', 'kgf'],
-    bengali: ['uttam', 'satyajit', 'bengali', 'kolkata', 'calcutta', 'bengal', 'prosenjit', 'dev', 'tollygunge', 'tollywood']
+    malayalam: ['mohanlal', 'mammootty', 'fahadh', 'prithviraj', 'nivin', 'dulquer', 'malayalam', 'kerala', 'mollywood', 'kochi'],
+    english: ['english', 'hollywood', 'american', 'british', 'uk', 'usa'],
+    spanish: ['spanish', 'espanol', 'mexico', 'spain', 'latino'],
+    french: ['french', 'paris', 'france', 'francais'],
+    german: ['german', 'germany', 'deutsch', 'berlin'],
+    japanese: ['japanese', 'japan', 'tokyo', 'anime', 'samurai', 'yakuza'],
+    korean: ['korean', 'korea', 'seoul', 'kdrama', 'parasite'],
+    chinese: ['chinese', 'china', 'hong kong', 'mandarin', 'beijing'],
+    italian: ['italian', 'italy', 'rome', 'italiano'],
+    portuguese: ['portuguese', 'brazil', 'portugal', 'brasileiro'],
+    russian: ['russian', 'russia', 'moscow', 'soviet'],
+    arabic: ['arabic', 'arab', 'middle east', 'dubai'],
+    turkish: ['turkish', 'turkey', 'istanbul', 'turkiye']
 };
 
 class MovieScraper {

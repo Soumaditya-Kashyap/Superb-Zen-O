@@ -249,3 +249,109 @@ exports.getMoviesByCategory = async (req, res) => {
     });
   }
 };
+
+// Add/Remove movie to/from favorites
+exports.toggleFavorite = async (req, res) => {
+  try {
+    const { imdbId } = req.body;
+    const userId = req.user.id;
+
+    console.log(`💖 Toggling favorite for user ${userId}, movie ${imdbId}`);
+
+    const User = require('../models/user.js');
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Initialize favorites array if it doesn't exist
+    if (!user.favorites) {
+      user.favorites = [];
+    }
+
+    // Check if movie is already in favorites
+    const favoriteIndex = user.favorites.indexOf(imdbId);
+
+    if (favoriteIndex > -1) {
+      // Remove from favorites
+      user.favorites.splice(favoriteIndex, 1);
+      await user.save();
+      console.log(`✅ Removed ${imdbId} from favorites`);
+      
+      return res.json({
+        success: true,
+        message: 'Movie removed from favorites',
+        isFavorite: false,
+        favorites: user.favorites
+      });
+    } else {
+      // Add to favorites
+      user.favorites.push(imdbId);
+      await user.save();
+      console.log(`✅ Added ${imdbId} to favorites`);
+      
+      return res.json({
+        success: true,
+        message: 'Movie added to favorites',
+        isFavorite: true,
+        favorites: user.favorites
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Toggle favorite error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to toggle favorite'
+    });
+  }
+};
+
+// Get user's favorite movies
+exports.getFavorites = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log(`💖 Fetching favorites for user ${userId}`);
+
+    const User = require('../models/user.js');
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    if (!user.favorites || user.favorites.length === 0) {
+      return res.json({
+        success: true,
+        favorites: [],
+        message: 'No favorites yet'
+      });
+    }
+
+    // Fetch movie details for all favorites
+    const movies = await Movie.find({ imdbID: { $in: user.favorites } });
+
+    console.log(`✅ Found ${movies.length} favorite movies`);
+
+    res.json({
+      success: true,
+      favorites: movies,
+      totalResults: movies.length
+    });
+
+  } catch (error) {
+    console.error('❌ Get favorites error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch favorites'
+    });
+  }
+};

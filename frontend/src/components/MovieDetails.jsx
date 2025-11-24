@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
 import { Play, Users, X, Star } from 'lucide-react';
 import MovieService from '../services/movieService';
+import WatchModeModal from './WatchModeModal';
 
 const MovieDetails = ({ imdbId, onClose }) => {
+  const navigate = useNavigate();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showWatchModal, setShowWatchModal] = useState(false);
 
   useEffect(() => {
     const fetchMovieDetails = async () => {
@@ -29,6 +33,23 @@ const MovieDetails = ({ imdbId, onClose }) => {
       fetchMovieDetails();
     }
   }, [imdbId]);
+
+  const handleImageError = (e) => {
+    e.target.src = 'https://via.placeholder.com/400x600?text=No+Poster';
+  };
+
+  const handleWatchNow = () => {
+    setShowWatchModal(true);
+  };
+
+  const handleWatchMode = (mode) => {
+    setShowWatchModal(false);
+    if (mode === 'alone') {
+      navigate(`/player/${imdbId}`);
+    } else {
+      alert('Watch Together feature coming soon!');
+    }
+  };
 
   if (loading) {
     return (
@@ -58,112 +79,122 @@ const MovieDetails = ({ imdbId, onClose }) => {
     ? movie.Poster 
     : 'https://via.placeholder.com/400x600?text=No+Poster';
 
-  const handleImageError = (e) => {
-    e.target.src = 'https://via.placeholder.com/400x600?text=No+Poster';
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="glass-effect-dark rounded-2xl max-w-6xl w-full my-8 relative" onClick={(e) => e.stopPropagation()}>
-        <button className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl flex items-center justify-center transition-colors z-10" onClick={onClose}>
-          <X size={24} />
-        </button>
-        
-        <div className="flex flex-col md:flex-row gap-8 p-8">
-          <div className="flex-shrink-0">
-            <img 
-              src={posterUrl} 
-              alt={movie.Title}
-              onError={handleImageError}
-              className="w-full md:w-80 rounded-lg shadow-2xl"
-            />
-          </div>
-
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold text-white mb-3">{movie.Title}</h1>
-            <div className="flex items-center gap-3 text-white/70 mb-4">
-              <span>{movie.Year}</span>
-              <span>•</span>
-              <span>{movie.Rated}</span>
-              <span>•</span>
-              <span>{movie.Runtime}</span>
+    <>
+      <WatchModeModal 
+        isOpen={showWatchModal}
+        onClose={() => setShowWatchModal(false)}
+        onSelectMode={handleWatchMode}
+        movieTitle={movie?.Title || ''}
+      />
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
+        <div className="glass-effect-dark rounded-2xl max-w-6xl w-full my-8 relative" onClick={(e) => e.stopPropagation()}>
+          <button className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl flex items-center justify-center transition-colors z-10" onClick={onClose}>
+            <X size={24} />
+          </button>
+          
+          <div className="flex flex-col md:flex-row gap-8 p-8">
+            <div className="flex-shrink-0">
+              <img 
+                src={posterUrl} 
+                alt={movie.Title}
+                onError={handleImageError}
+                className="w-full md:w-80 rounded-lg shadow-2xl"
+              />
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-6">
-              {movie.Genre && movie.Genre.split(',').map((genre, idx) => (
-                <span key={idx} className="px-3 py-1 bg-white/10 text-white/80 rounded-full text-sm">{genre.trim()}</span>
-              ))}
-            </div>
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold text-white mb-3">{movie.Title}</h1>
+              <div className="flex items-center gap-3 text-white/70 mb-4">
+                <span>{movie.Year}</span>
+                <span>•</span>
+                <span>{movie.Rated}</span>
+                <span>•</span>
+                <span>{movie.Runtime}</span>
+              </div>
 
-            <div className="flex flex-wrap gap-4 mb-6">
-              {movie.Ratings && movie.Ratings.map((rating, index) => (
-                <div key={index} className="glass-effect px-4 py-2 rounded-lg">
-                  <div className="text-white/60 text-xs mb-1">{rating.Source}</div>
-                  <div className="text-white font-semibold">{rating.Value}</div>
-                </div>
-              ))}
-              {movie.imdbRating && (
-                <div className="glass-effect px-4 py-2 rounded-lg border border-gold/30">
-                  <div className="text-gold-light text-xs mb-1">IMDb</div>
-                  <div className="text-white font-semibold flex items-center gap-1">
-                    <Star size={16} fill="#FFD700" className="text-yellow-400" /> {movie.imdbRating}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {movie.Genre && movie.Genre.split(',').map((genre, idx) => (
+                  <span key={idx} className="px-3 py-1 bg-white/10 text-white/80 rounded-full text-sm">{genre.trim()}</span>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-4 mb-6">
+                {movie.Ratings && movie.Ratings.map((rating, index) => (
+                  <div key={index} className="glass-effect px-4 py-2 rounded-lg">
+                    <div className="text-white/60 text-xs mb-1">{rating.Source}</div>
+                    <div className="text-white font-semibold">{rating.Value}</div>
                   </div>
-                </div>
-              )}
-            </div>
+                ))}
+                {movie.imdbRating && (
+                  <div className="glass-effect px-4 py-2 rounded-lg border border-gold/30">
+                    <div className="text-gold-light text-xs mb-1">IMDb</div>
+                    <div className="text-white font-semibold flex items-center gap-1">
+                      <Star size={16} fill="#FFD700" className="text-yellow-400" /> {movie.imdbRating}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold text-white mb-2">Plot</h3>
-              <p className="text-white/70 leading-relaxed">{movie.Plot}</p>
-            </div>
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-white mb-2">Plot</h3>
+                <p className="text-white/70 leading-relaxed">{movie.Plot}</p>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
-              <div>
-                <span className="text-white/60">Director: </span>
-                <span className="text-white">{movie.Director}</span>
-              </div>
-              <div>
-                <span className="text-white/60">Actors: </span>
-                <span className="text-white">{movie.Actors}</span>
-              </div>
-              <div>
-                <span className="text-white/60">Writers: </span>
-                <span className="text-white">{movie.Writer}</span>
-              </div>
-              <div>
-                <span className="text-white/60">Language: </span>
-                <span className="text-white">{movie.Language}</span>
-              </div>
-              <div>
-                <span className="text-white/60">Country: </span>
-                <span className="text-white">{movie.Country}</span>
-              </div>
-              {movie.Awards && movie.Awards !== 'N/A' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
                 <div>
-                  <span className="text-white/60">Awards: </span>
-                  <span className="text-white">{movie.Awards}</span>
+                  <span className="text-white/60">Director: </span>
+                  <span className="text-white">{movie.Director}</span>
                 </div>
-              )}
-              {movie.BoxOffice && movie.BoxOffice !== 'N/A' && (
                 <div>
-                  <span className="text-white/60">Box Office: </span>
-                  <span className="text-white">{movie.BoxOffice}</span>
+                  <span className="text-white/60">Actors: </span>
+                  <span className="text-white">{movie.Actors}</span>
                 </div>
-              )}
-            </div>
+                <div>
+                  <span className="text-white/60">Writers: </span>
+                  <span className="text-white">{movie.Writer}</span>
+                </div>
+                <div>
+                  <span className="text-white/60">Language: </span>
+                  <span className="text-white">{movie.Language}</span>
+                </div>
+                <div>
+                  <span className="text-white/60">Country: </span>
+                  <span className="text-white">{movie.Country}</span>
+                </div>
+                {movie.Awards && movie.Awards !== 'N/A' && (
+                  <div>
+                    <span className="text-white/60">Awards: </span>
+                    <span className="text-white">{movie.Awards}</span>
+                  </div>
+                )}
+                {movie.BoxOffice && movie.BoxOffice !== 'N/A' && (
+                  <div>
+                    <span className="text-white/60">Box Office: </span>
+                    <span className="text-white">{movie.BoxOffice}</span>
+                  </div>
+                )}
+              </div>
 
-            <div className="flex gap-4">
-              <button className="px-8 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2">
-                <Play size={20} fill="currentColor" /> Watch Now
-              </button>
-              <button className="px-8 py-3 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2">
-                <Users size={20} /> Watch Together
-              </button>
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleWatchNow}
+                  className="px-8 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2"
+                >
+                  <Play size={20} fill="currentColor" /> Watch Now
+                </button>
+                <button 
+                  onClick={handleWatchNow}
+                  className="px-8 py-3 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+                >
+                  <Users size={20} /> Watch Together
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
