@@ -1,7 +1,3 @@
-//this is the file Superb-Zen-O/frontend/src/admin/Register.jsx
-
-
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, Lock, Eye, EyeOff } from "lucide-react";
@@ -25,15 +21,33 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
     confirmPassword: "",
   });
 
+  // Handle input
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError("");
   };
 
+  // Phone Limit: only allow 10 digits
+  const handlePhoneChange = (e) => {
+    const value = e.target.value.replace(/\D/g, ""); // remove non-numeric
+
+    if (value.length <= 10) {
+      setFormData({ ...formData, phone: value });
+    }
+  };
+
+  // Submit
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Basic validation
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters!");
+      setLoading(false);
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match!");
@@ -41,15 +55,19 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
       return;
     }
 
+    if (formData.phone.length !== 10) {
+      setError("Phone number must be 10 digits.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          role: "admin"   // force admin registration
+          role: "admin",
         }),
       });
 
@@ -68,8 +86,8 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
         setError(data.message || "Registration failed.");
       }
     } catch (err) {
-      setError("Network error. Please try again.");
       console.error("Register error:", err);
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +96,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-black">
 
-      {/* Left Section */}
+      {/* LEFT SIDE */}
       <div className="flex items-center justify-center px-8 lg:px-16 py-12">
         <div className="w-full max-w-lg">
 
@@ -87,19 +105,18 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
 
           {/* Error */}
           {error && (
-            <div className="px-4 py-3 mb-5 rounded-lg text-sm bg-red-500/10 border border-red-500/30 text-red-400">
+            <div className="px-4 py-3 mb-5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               {error}
             </div>
           )}
 
           {/* Success */}
           {success && (
-            <div className="px-4 py-3 mb-5 rounded-lg text-sm bg-green-500/10 border border-green-500/30 text-green-400">
+            <div className="px-4 py-3 mb-5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
               {success}
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleRegister} className="space-y-5">
 
             {/* Full Name */}
@@ -115,7 +132,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   onChange={handleChange}
                   placeholder="Enter full name"
                   className="w-full py-3.5 pl-12 pr-4 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
               </div>
             </div>
@@ -133,7 +150,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   onChange={handleChange}
                   placeholder="Enter nickname"
                   className="w-full py-3.5 pl-12 pr-4 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
               </div>
             </div>
@@ -151,7 +168,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   onChange={handleChange}
                   placeholder="Enter email"
                   className="w-full py-3.5 pl-12 pr-4 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
               </div>
             </div>
@@ -166,10 +183,11 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   name="phone"
                   required
                   value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Enter phone"
+                  onChange={handlePhoneChange}
+                  placeholder="Enter 10-digit phone"
+                  inputMode="numeric"
                   className="w-full py-3.5 pl-12 pr-4 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
               </div>
             </div>
@@ -187,7 +205,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   onChange={handleChange}
                   placeholder="Enter password"
                   className="w-full py-3.5 pl-12 pr-12 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
                 <button
                   type="button"
@@ -212,7 +230,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
                   onChange={handleChange}
                   placeholder="Confirm password"
                   className="w-full py-3.5 pl-12 pr-12 bg-white/5 border border-white/10 
-                  rounded-lg text-white placeholder:text-white/30 focus:border-gold"
+                    rounded-lg text-white placeholder:text-white/30 focus:border-gold"
                 />
                 <button
                   type="button"
@@ -224,15 +242,16 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
               className="w-full py-3.5 bg-gradient-to-r from-gold to-gold-light text-black
-              font-semibold rounded-lg hover:shadow-lg hover:shadow-gold/30 disabled:opacity-50"
+                font-semibold rounded-lg hover:shadow-lg hover:shadow-gold/30 disabled:opacity-50"
             >
               {loading ? "Creating Admin..." : "Register as Admin"}
             </button>
+
           </form>
 
           <div className="mt-6 text-center text-white/70">
@@ -245,10 +264,10 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
             </button>
           </div>
 
-
         </div>
       </div>
-      {/* Right Side Image */}
+
+      {/* RIGHT IMAGE */}
       <div className="hidden lg:flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-black px-16">
         <div className="w-full max-w-2xl text-center">
           <img

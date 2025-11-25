@@ -52,6 +52,14 @@ const Signup = ({ setIsAuthenticated }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError('');
   };
+  // ⭐ FIXED PHONE HANDLER — ONLY DIGITS, MAX 10 ⭐
+  const handlePhoneInput = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, ""); // remove non-digits
+    if (digitsOnly.length <= 10) {
+      setFormData(prev => ({ ...prev, phone: digitsOnly }));
+    }
+    setError("");
+  };
 
   const toggleLanguage = (lang) => {
     setFormData(prev => {
@@ -265,12 +273,14 @@ const Signup = ({ setIsAuthenticated }) => {
               <label className="text-white/80 text-sm font-medium mb-2 block">Phone Number</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={20} />
-                <input
-                  type="tel"
+                 <input
+                  type="text"
                   value={formData.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="Enter your phone number"
-                  className="w-full py-3.5 pl-12 pr-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8"
+                  onChange={handlePhoneInput}
+                  placeholder="Enter your 10 digit phone number"
+                  inputMode="numeric"
+                  maxLength={10}
+                  className="w-full py-3.5 pl-12 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 transition-all duration-300 focus:outline-none focus:border-gold focus:bg-white/8"
                 />
               </div>
             </div>
