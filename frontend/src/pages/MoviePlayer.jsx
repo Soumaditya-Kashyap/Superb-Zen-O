@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import TopNavbar from '../components/TopNavbar';
 import { 
   ArrowLeft, 
   Heart,
@@ -192,7 +193,10 @@ const MoviePlayer = () => {
 
   return (
     <div className="min-h-screen bg-black">
+      <TopNavbar showBackButton={true} />
+
       {/* Back Button - Always visible */}
+{/*   
       <motion.button
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -202,27 +206,34 @@ const MoviePlayer = () => {
         className="fixed top-6 left-24 z-50 p-3 bg-black/80 backdrop-blur-xl border border-gold/30 rounded-xl hover:bg-gold/20 transition-all shadow-lg"
       >
         <ArrowLeft size={24} className="text-gold" />
-      </motion.button>
+      </motion.button> */}
 
       {/* HLS Video Player Section */}
-      <div className="max-w-[95%] xl:max-w-7xl mx-auto px-4 pt-24 pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl overflow-hidden shadow-2xl shadow-gold/20 border-2 border-gold/30 bg-gradient-to-b from-gold/5 to-transparent p-2"
-        >
-          <div className="rounded-xl overflow-hidden">
-            <HLSVideoPlayer
-              movieId={imdbId}
-              movieTitle={movie.Title}
-              posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
-            />
-          </div>
-        </motion.div>
-      </div>
+{/* HLS Video Player Section – width 95% & height 85% */}
+<div className="w-[95%] mx-auto pt-24 pb-8">
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="relative rounded-2xl overflow-hidden shadow-2xl shadow-gold/20 
+               border-2 border-gold/30 bg-gradient-to-b from-gold/5 to-transparent p-2"
+    style={{ height: "88vh" }}   // 👈 UPDATED height
+  >
+    <div className="rounded-xl overflow-hidden h-full">
+      <HLSVideoPlayer
+        movieId={imdbId}
+        movieTitle={movie.Title}
+        posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
+        height="100%"
+      />
+    </div>
+  </motion.div>
+</div>
+
+
+
 
       {/* Content Section */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         {/* Movie Title & Info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

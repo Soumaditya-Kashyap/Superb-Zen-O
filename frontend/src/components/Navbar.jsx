@@ -39,7 +39,7 @@ const Navbar = () => {
             
         <div className="w-full h-9 flex items-center justify-center ml-12">
           <img 
-            src="/images/appLogo/icon-for-white.png" 
+            src="/images/appLogo/icon-for-dark.png" 
             alt="Superb" 
             className="w-full h-full object-contain"
             onError={(e) => {
@@ -57,10 +57,6 @@ const Navbar = () => {
         </div>
         </div>
       </div>
-
-
-
-
       
       {/* Main Navigation */}
       <ul className="list-none p-0 m-0 w-full flex-1 overflow-y-auto custom-scrollbar">
