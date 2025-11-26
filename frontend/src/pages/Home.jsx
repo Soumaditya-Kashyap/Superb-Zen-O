@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   Search,
   Bell,
   ChevronDown,
@@ -35,12 +35,12 @@ const Home = () => {
 
   // Hero carousel data
   const heroSlides = [
-      {
+    {
       id: 1,
       title: "Roi Roi Binale",
       subtitle: "The Ultimate Showdown",
       description: "An action-packed thriller that keeps you on the edge",
-      image: "/images/movie-posters/roiroibinale.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/roiroibinale.jpeg?updatedAt=1764192546167",
       tags: ["2h 15min", "Action", "Movie", "2025", "13+"],
       imdbID: "tt1234567" // Placeholder ID for hero movies without IMDb
     },
@@ -49,7 +49,8 @@ const Home = () => {
       title: "How to Train Your Dragon",
       subtitle: "The Final Chapter",
       description: "Experience the epic conclusion of the beloved trilogy",
-      image: "/images/movie-posters/image.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/howtotraindrogon.jpeg?updatedAt=1764192736781",
+
       tags: ["1h 56min", "Action", "Movie", "2025", "6+"],
       imdbID: "tt2386490"
     },
@@ -58,7 +59,8 @@ const Home = () => {
       title: "Padmavat",
       subtitle: "A Royal Saga",
       description: "Witness the legendary tale of honor and sacrifice",
-      image: "/images/movie-posters/padmavat.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/padmaavai.jpeg?updatedAt=1764192671091",
+
       tags: ["2h 44min", "Drama", "Movie", "2018", "13+"],
       imdbID: "tt5935704"
     }
@@ -86,7 +88,7 @@ const Home = () => {
             MovieService.getMoviesByCategory('popular'),
             MovieService.getMoviesByCategory('action'),
           ]);
-          
+
           setMovieCategories([
             { title: 'Trending Now', movies: trending.movies || [] },
             { title: 'Popular Movies', movies: popular.movies || [] },
@@ -107,7 +109,7 @@ const Home = () => {
         });
 
         console.log('📡 Response status:', response.status, response.statusText);
-        
+
         if (!response.ok) {
           console.error('❌ HTTP Error:', response.status, response.statusText);
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -127,17 +129,17 @@ const Home = () => {
 
           // Always add Trending first (from database)
           const trending = await MovieService.getMoviesByCategory('trending');
-          categories.push({ 
-            title: 'Trending Now', 
+          categories.push({
+            title: 'Trending Now',
             movies: trending.movies || [],
-            isPriority: true 
+            isPriority: true
           });
 
           // Add ALL personalized categories from DATABASE (based on user's selected genres AND languages)
           if (data.personalizedMovies && data.personalizedMovies.length > 0) {
             console.log(`✅ Found ${data.personalizedMovies.length} personalized categories from DATABASE`);
             console.log(`🎯 User preferences - Genres: ${data.userPreferences?.genres?.join(', ')}, Languages: ${data.userPreferences?.languages?.join(', ')}`);
-            
+
             data.personalizedMovies.forEach((item, index) => {
               if (item.movies && item.movies.length > 0) {
                 // Database movies use different structure - map to consistent format
@@ -151,11 +153,11 @@ const Home = () => {
                   imdbRating: movie.imdbRating,
                   Plot: movie.Plot
                 }));
-                
+
                 // Check if this is a language category
                 const isLanguageCategory = item.isLanguageCategory === true;
                 const categoryTitle = isLanguageCategory ? item.displayName : `${item.displayName} - For You`;
-                
+
                 categories.push({
                   title: categoryTitle,
                   movies: formattedMovies,
@@ -163,7 +165,7 @@ const Home = () => {
                   isLanguageCategory: isLanguageCategory,
                   priority: index // Order by user's selection
                 });
-                
+
                 const categoryType = isLanguageCategory ? '🌐 Language' : '🎭 Genre';
                 console.log(`📽️  Added ${formattedMovies.length} ${item.genre} movies [${categoryType}] (Top rating: ${formattedMovies[0]?.imdbRating}⭐)`);
               }
@@ -171,9 +173,9 @@ const Home = () => {
 
             // Add Popular at the end
             const popular = await MovieService.getMoviesByCategory('action');
-            categories.push({ 
-              title: 'Popular Action Movies', 
-              movies: popular.movies || [] 
+            categories.push({
+              title: 'Popular Action Movies',
+              movies: popular.movies || []
             });
 
             console.log(`🎉 Personalized dashboard loaded with ${data.personalizedMovies.length} custom categories!`);
@@ -268,7 +270,7 @@ const Home = () => {
   // Handle filter change from TopNavbar
   const handleFilterChange = (filter) => {
     setFilterType(filter);
-    
+
     if (filter === 'All Media') {
       setFilteredCategories(movieCategories);
       return;
@@ -280,14 +282,14 @@ const Home = () => {
       const filteredMovies = category.movies.filter(movie => {
         const genre = (movie.Genre || '').toLowerCase();
         const type = (movie.Type || '').toLowerCase();
-        
+
         if (filter === 'Movies') return type === 'movie' || type === '';
         if (filter === 'Series') return type === 'series';
-        
+
         // Genre filters
         return genre.includes(filterLower);
       });
-      
+
       return {
         ...category,
         movies: filteredMovies
@@ -307,11 +309,11 @@ const Home = () => {
       {/* Main Content Area */}
       <div>
         {/* Top Navigation Bar */}
-         <TopNavbar 
-           showBackButton={false} 
-           onFilterChange={handleFilterChange}
-           currentFilter={filterType}
-         />
+        <TopNavbar
+          showBackButton={false}
+          onFilterChange={handleFilterChange}
+          currentFilter={filterType}
+        />
 
         {/* Hero Carousel Section */}
         <div className="pt-28 px-8 pb-4">
@@ -330,7 +332,7 @@ const Home = () => {
                 <div className="relative h-full w-full rounded-3xl overflow-hidden bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl border-4 border-white/20 shadow-2xl">
                   {/* Movie Poster - Full visibility */}
                   <div className="absolute inset-0">
-                    <img 
+                    <img
                       src={heroSlides[currentSlide].image}
                       alt={heroSlides[currentSlide].title}
                       className="w-full h-full object-cover"
@@ -343,14 +345,14 @@ const Home = () => {
                   <div className="absolute bottom-0 left-0 right-0 p-10 pb-12">
                     <div className="max-w-3xl space-y-4">
                       {/* Tags */}
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
                         className="flex items-center gap-2 flex-wrap"
                       >
                         {heroSlides[currentSlide].tags.map((tag, index) => (
-                          <span 
+                          <span
                             key={index}
                             className="px-3 py-1 bg-white/15 backdrop-blur-md border border-white/30 rounded-lg text-white text-xs font-semibold"
                           >
@@ -360,7 +362,7 @@ const Home = () => {
                       </motion.div>
 
                       {/* Title - Smaller and cleaner */}
-                      <motion.h1 
+                      <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
@@ -370,7 +372,7 @@ const Home = () => {
                       </motion.h1>
 
                       {/* Subtitle */}
-                      <motion.p 
+                      <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
@@ -380,7 +382,7 @@ const Home = () => {
                       </motion.p>
 
                       {/* Description */}
-                      <motion.p 
+                      <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
@@ -390,7 +392,7 @@ const Home = () => {
                       </motion.p>
 
                       {/* Buttons */}
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.6 }}
@@ -428,11 +430,10 @@ const Home = () => {
                   onClick={() => setCurrentSlide(index)}
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
-                  className={`transition-all duration-500 rounded-full ${
-                    index === currentSlide
+                  className={`transition-all duration-500 rounded-full ${index === currentSlide
                       ? 'w-10 h-2.5 bg-gradient-to-r from-gold to-gold-light shadow-md shadow-gold/50'
                       : 'w-2.5 h-2.5 bg-white/30 hover:bg-white/50'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -464,181 +465,181 @@ const Home = () => {
 
         {/* Movie Content */}
         <div className="px-8 py-8">
-        {loading ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex flex-col items-center justify-center py-20"
-          >
+          {loading ? (
             <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="relative"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center justify-center py-20"
             >
-              <div className="w-16 h-16 border-4 border-gold/30 border-t-gold rounded-full"></div>
-              <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gold w-6 h-6" />
-            </motion.div>
-            <motion.p 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-white/60 mt-6 text-lg font-medium"
-            >
-              Loading your personalized movies...
-            </motion.p>
-            
-            {/* Loading Skeleton */}
-            <div className="w-full max-w-6xl mt-12 space-y-8">
-              {[1, 2, 3].map((i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + i * 0.1 }}
-                  className="space-y-4"
-                >
-                  <div className="h-6 w-48 bg-white/10 rounded-lg animate-pulse"></div>
-                  <div className="flex gap-4">
-                    {[1, 2, 3, 4, 5].map((j) => (
-                      <div key={j} className="flex-none w-[200px] h-[350px] bg-white/5 rounded-xl animate-pulse"></div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <AnimatePresence>
-            {filteredCategories.length > 0 ? (
-              filteredCategories.map((category, idx) => {
-              // Determine icon based on category title
-              const getCategoryIcon = (title) => {
-                if (title.includes('Trending')) return <TrendingUp className="text-gold" size={24} />;
-                if (title.includes('Popular')) return <Star className="text-gold" size={24} />;
-                if (title.includes('For You')) return <Heart className="text-gold" size={24} />;
-                if (title.includes('Movies') && !title.includes('For You')) return <Globe className="text-gold" size={24} />; // Language categories
-                return <Sparkles className="text-gold" size={24} />;
-              };
-
-              const isPersonalized = category.title.includes('For You');
-              const isLanguageCategory = category.isLanguageCategory || (category.title.includes('Movies') && !category.title.includes('For You'));
-
-              return (
-                <motion.div 
-                  key={idx}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1, duration: 0.5 }}
-                  className="mb-10"
-                >
-                  {/* Category Header */}
-                  <div className="flex items-center gap-3 mb-6">
-                    {getCategoryIcon(category.title)}
-                    <h2 className="text-3xl font-bold text-white">{category.title}</h2>
-                    {isPersonalized && (
-                      <span className="px-3 py-1 bg-gold/20 text-gold border border-gold/30 rounded-full text-xs font-medium">
-                        Personalized
-                      </span>
-                    )}
-                    {isLanguageCategory && (
-                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-xs font-medium flex items-center gap-1">
-                        <Globe size={12} />
-                        Language
-                      </span>
-                    )}
-                    {category.movies && category.movies.length > 0 && (
-                      <span className="text-white/40 text-sm ml-auto">
-                        {category.movies.length} movies
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Movies Horizontal Scroll */}
-                  <div className="relative group">
-                    {/* Gradient Overlays for scroll indication */}
-                    <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
-                    <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gold/30 scrollbar-track-transparent hover:scrollbar-thumb-gold/50 transition-all">
-                      {category.movies && category.movies.length > 0 ? (
-                        category.movies.map((movie, movieIdx) => (
-                          <motion.div 
-                            key={movie.imdbID}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.1 + movieIdx * 0.02, duration: 0.3 }}
-                            whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
-                            className="flex-none w-[200px]"
-                          >
-                            <MovieCard 
-                              movie={movie} 
-                              onClick={handleMovieClick}
-                              isPersonalized={category.isPersonalized}
-                            />
-                          </motion.div>
-                        ))
-                      ) : (
-                        <div className="flex items-center justify-center w-full py-10">
-                          <p className="text-white/40 text-lg">No movies available in this category</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })
-            ) : (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-20"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="relative"
               >
-                <p className="text-white/60 text-lg">No movies found for "{filterType}" filter</p>
-                <button 
-                  onClick={() => handleFilterChange('All Media')}
-                  className="mt-4 px-6 py-2 bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition-colors"
-                >
-                  Clear Filter
-                </button>
+                <div className="w-16 h-16 border-4 border-gold/30 border-t-gold rounded-full"></div>
+                <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gold w-6 h-6" />
               </motion.div>
-            )}
-          </AnimatePresence>
-        )}
-      </div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-white/60 mt-6 text-lg font-medium"
+              >
+                Loading your personalized movies...
+              </motion.p>
 
-      {/* Movie Details Modal */}
-      {selectedMovie && (
-        <MovieDetails 
-          imdbId={selectedMovie} 
-          onClose={handleCloseDetails}
+              {/* Loading Skeleton */}
+              <div className="w-full max-w-6xl mt-12 space-y-8">
+                {[1, 2, 3].map((i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.1 }}
+                    className="space-y-4"
+                  >
+                    <div className="h-6 w-48 bg-white/10 rounded-lg animate-pulse"></div>
+                    <div className="flex gap-4">
+                      {[1, 2, 3, 4, 5].map((j) => (
+                        <div key={j} className="flex-none w-[200px] h-[350px] bg-white/5 rounded-xl animate-pulse"></div>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <AnimatePresence>
+              {filteredCategories.length > 0 ? (
+                filteredCategories.map((category, idx) => {
+                  // Determine icon based on category title
+                  const getCategoryIcon = (title) => {
+                    if (title.includes('Trending')) return <TrendingUp className="text-gold" size={24} />;
+                    if (title.includes('Popular')) return <Star className="text-gold" size={24} />;
+                    if (title.includes('For You')) return <Heart className="text-gold" size={24} />;
+                    if (title.includes('Movies') && !title.includes('For You')) return <Globe className="text-gold" size={24} />; // Language categories
+                    return <Sparkles className="text-gold" size={24} />;
+                  };
+
+                  const isPersonalized = category.title.includes('For You');
+                  const isLanguageCategory = category.isLanguageCategory || (category.title.includes('Movies') && !category.title.includes('For You'));
+
+                  return (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1, duration: 0.5 }}
+                      className="mb-10"
+                    >
+                      {/* Category Header */}
+                      <div className="flex items-center gap-3 mb-6">
+                        {getCategoryIcon(category.title)}
+                        <h2 className="text-3xl font-bold text-white">{category.title}</h2>
+                        {isPersonalized && (
+                          <span className="px-3 py-1 bg-gold/20 text-gold border border-gold/30 rounded-full text-xs font-medium">
+                            Personalized
+                          </span>
+                        )}
+                        {isLanguageCategory && (
+                          <span className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-xs font-medium flex items-center gap-1">
+                            <Globe size={12} />
+                            Language
+                          </span>
+                        )}
+                        {category.movies && category.movies.length > 0 && (
+                          <span className="text-white/40 text-sm ml-auto">
+                            {category.movies.length} movies
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Movies Horizontal Scroll */}
+                      <div className="relative group">
+                        {/* Gradient Overlays for scroll indication */}
+                        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                        <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gold/30 scrollbar-track-transparent hover:scrollbar-thumb-gold/50 transition-all">
+                          {category.movies && category.movies.length > 0 ? (
+                            category.movies.map((movie, movieIdx) => (
+                              <motion.div
+                                key={movie.imdbID}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: idx * 0.1 + movieIdx * 0.02, duration: 0.3 }}
+                                whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
+                                className="flex-none w-[200px]"
+                              >
+                                <MovieCard
+                                  movie={movie}
+                                  onClick={handleMovieClick}
+                                  isPersonalized={category.isPersonalized}
+                                />
+                              </motion.div>
+                            ))
+                          ) : (
+                            <div className="flex items-center justify-center w-full py-10">
+                              <p className="text-white/40 text-lg">No movies available in this category</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center justify-center py-20"
+                >
+                  <p className="text-white/60 text-lg">No movies found for "{filterType}" filter</p>
+                  <button
+                    onClick={() => handleFilterChange('All Media')}
+                    className="mt-4 px-6 py-2 bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition-colors"
+                  >
+                    Clear Filter
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
+        </div>
+
+        {/* Movie Details Modal */}
+        {selectedMovie && (
+          <MovieDetails
+            imdbId={selectedMovie}
+            onClose={handleCloseDetails}
+          />
+        )}
+
+        {/* Hero Watch Mode Modal */}
+        <WatchModeModal
+          isOpen={showHeroWatchModal}
+          onClose={() => setShowHeroWatchModal(false)}
+          onSelectMode={handleHeroWatchMode}
+          movieTitle={selectedHeroMovie?.title || ''}
         />
-      )}
 
-      {/* Hero Watch Mode Modal */}
-      <WatchModeModal 
-        isOpen={showHeroWatchModal}
-        onClose={() => setShowHeroWatchModal(false)}
-        onSelectMode={handleHeroWatchMode}
-        movieTitle={selectedHeroMovie?.title || ''}
-      />
-
-      {/* Scroll to Top Button */}
-      <AnimatePresence>
-        {showScrollTop && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0, y: 20 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={scrollToTop}
-            className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-gold to-gold-light text-black shadow-2xl shadow-gold/30 flex items-center justify-center hover:shadow-gold/50 transition-shadow"
-          >
-            <ArrowUp size={24} strokeWidth={2.5} />
-          </motion.button>
-        )}
-      </AnimatePresence>
+        {/* Scroll to Top Button */}
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0, y: 20 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={scrollToTop}
+              className="fixed bottom-8 right-8 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-gold to-gold-light text-black shadow-2xl shadow-gold/30 flex items-center justify-center hover:shadow-gold/50 transition-shadow"
+            >
+              <ArrowUp size={24} strokeWidth={2.5} />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
