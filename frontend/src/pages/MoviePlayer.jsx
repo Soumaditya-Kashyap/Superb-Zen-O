@@ -52,54 +52,67 @@ const MoviePlayer = () => {
             categories: ['action', 'thriller']
           }
         };
-        
-        // Fetch movie details
-        const response = await MovieService.getMovieDetails(imdbId);
-        console.log('Movie response:', response);
-        
-        // Handle both {success: true, movie: {...}} and direct movie object
-        let movieData = response.success ? response.movie : response;
-        
-        // If movie not found and it's a hero movie, use fallback
-        if (!movieData || (response.success === false && heroMovieFallbacks[imdbId])) {
+
+        // If it's a known hero movie, use fallback immediately
+        if (heroMovieFallbacks[imdbId]) {
           console.log('Using fallback data for hero movie:', imdbId);
-          movieData = heroMovieFallbacks[imdbId];
+          setMovie(heroMovieFallbacks[imdbId]);
+          setLoading(false);
+          return;
         }
         
-        setMovie(movieData);
-        console.log('Movie data set:', movieData);
+        // Fetch movie details with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        try {
+          const response = await MovieService.getMovieDetails(imdbId);
+          clearTimeout(timeoutId);
+          console.log('Movie response:', response);
+          
+          // Handle both {success: true, movie: {...}} and direct movie object
+          let movieData = response.success ? response.movie : response;
+          
+          if (movieData) {
+            setMovie(movieData);
+            console.log('Movie data set:', movieData);
 
-        // Fetch related movies based on genre or categories
-        if (movieData) {
-          let primaryGenre = null;
-          
-          // Try to get genre from Genre field
-          if (movieData.Genre && movieData.Genre !== 'N/A') {
-            const genres = movieData.Genre.split(',').map(g => g.trim());
-            primaryGenre = genres[0].toLowerCase();
+            // Fetch related movies based on genre or categories
+            let primaryGenre = null;
+            
+            // Try to get genre from Genre field
+            if (movieData.Genre && movieData.Genre !== 'N/A') {
+              const genres = movieData.Genre.split(',').map(g => g.trim());
+              primaryGenre = genres[0].toLowerCase();
+            }
+            // Or from categories array (database movies)
+            else if (movieData.categories && movieData.categories.length > 0) {
+              primaryGenre = movieData.categories[0].toLowerCase();
+            }
+            
+            if (primaryGenre) {
+              console.log('Fetching related movies for genre:', primaryGenre);
+              const relatedData = await MovieService.getMoviesByCategory(primaryGenre);
+              // Filter out current movie and limit to 9 movies
+              const filtered = (relatedData.movies || [])
+                .filter(m => m.imdbID !== imdbId)
+                .slice(0, 9);
+              console.log('Related movies found:', filtered.length);
+              setRelatedMovies(filtered);
+            } else {
+              // Fallback: get trending movies as suggestions
+              console.log('No genre found, fetching trending movies');
+              const trendingData = await MovieService.getMoviesByCategory('trending');
+              const filtered = (trendingData.movies || [])
+                .filter(m => m.imdbID !== imdbId)
+                .slice(0, 9);
+              setRelatedMovies(filtered);
+            }
           }
-          // Or from categories array (database movies)
-          else if (movieData.categories && movieData.categories.length > 0) {
-            primaryGenre = movieData.categories[0].toLowerCase();
-          }
-          
-          if (primaryGenre) {
-            console.log('Fetching related movies for genre:', primaryGenre);
-            const relatedData = await MovieService.getMoviesByCategory(primaryGenre);
-            // Filter out current movie and limit to 9 movies
-            const filtered = (relatedData.movies || [])
-              .filter(m => m.imdbID !== imdbId)
-              .slice(0, 9);
-            console.log('Related movies found:', filtered.length);
-            setRelatedMovies(filtered);
-          } else {
-            // Fallback: get trending movies as suggestions
-            console.log('No genre found, fetching trending movies');
-            const trendingData = await MovieService.getMoviesByCategory('trending');
-            const filtered = (trendingData.movies || [])
-              .filter(m => m.imdbID !== imdbId)
-              .slice(0, 9);
-            setRelatedMovies(filtered);
+        } catch (fetchError) {
+          console.error('Fetch error, using fallback if available:', fetchError);
+          if (heroMovieFallbacks[imdbId]) {
+            setMovie(heroMovieFallbacks[imdbId]);
           }
         }
       } catch (error) {
