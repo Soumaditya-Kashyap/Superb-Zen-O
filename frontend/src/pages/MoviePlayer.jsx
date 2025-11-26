@@ -177,8 +177,7 @@ const MoviePlayer = () => {
       const type = (movie.Type || '').toLowerCase();
 
       // Clarify empty type handling logic.
-      // if (filter === 'Movies') return type === 'movie' || type === '';
-      if (filter === 'Movies') return type === 'movie';
+      if (filter === 'Movies') return type === 'movie' || type === '';
       if (filter === 'Series') return type === 'series';
       
       // Genre filters
@@ -233,21 +232,6 @@ const MoviePlayer = () => {
         onFilterChange={handleFilterChange}
         currentFilter={currentFilter}
       />
-
-      {/* Back Button - Always visible not needed anymore */}
-  
-      {/* <motion.button
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => navigate(-1)}
-        className="fixed top-6 left-24 z-50 p-3 bg-black/80 backdrop-blur-xl border border-gold/30 rounded-xl hover:bg-gold/20 transition-all shadow-lg"
-      >
-        <ArrowLeft size={24} className="text-gold" />
-      </motion.button> */}
-
-     
 {/* HLS Video Player Section */}
 <div className="w-[95%] mx-auto pt-20 pb-6">
   <motion.div
@@ -264,9 +248,6 @@ const MoviePlayer = () => {
     />
   </motion.div>
 </div>
-
-
-
 
       {/* Content Section */}
       <div className="w-full px-6 py-8">

@@ -478,6 +478,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
                 <Volume2 size={24} className="text-white" />
               )}
             </button>
+            
             <input
               type="range"
               min="0"
@@ -487,6 +488,11 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
               onChange={handleVolumeChange}
               className="w-0 group-hover/volume:w-20 transition-all accent-gold"
             />
+            
+            {/* Added Volume Text */}
+            <span className="w-0 overflow-hidden opacity-0 group-hover/volume:w-6 group-hover/volume:opacity-100 transition-all text-white text-sm font-medium">
+               {Math.round(volume * 100)}
+            </span>
           </div>
         </div>
 
@@ -513,7 +519,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
                 <button
                   onClick={() => changeQuality(-1)}
                   className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
-                    currentQuality === "Auto"
+                    currentQuality.startsWith("Auto")
                       ? "bg-gold/30 text-gold"
                       : "text-white"
                   }`}
@@ -536,7 +542,6 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
               </motion.div>
             )}
           </div>
-
           {/* Fullscreen */}
           <button
             onClick={toggleFullscreen}

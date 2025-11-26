@@ -21,6 +21,26 @@ const TopNavbar = ({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  // reference for handle outside dropdown click
+  const filterRef = useRef(null);
+
+  // useEffect to handle outside clicks for filter dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+    // If the ref exists AND the clicked element is NOT inside the ref container
+    if (filterRef.current && !filterRef.current.contains(event.target)) {
+      setShowFilterDropdown(false);
+    }
+  };
+
+  // Add event listener
+  document.addEventListener('mousedown', handleClickOutside);
+  
+  // Cleanup listener on unmount
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, []);
 
   const filterOptions = [
     "All Media",
@@ -76,8 +96,7 @@ const TopNavbar = ({
     }
 
     setIsSearching(true);
-    setIsSearching(true);    searchTimeoutRef.current = setTimeout(async () => {
-      try {
+    searchTimeoutRef.current = setTimeout(async () => {      try {
         const results = await MovieService.searchMovies(searchQuery);
         setSearchResults(results.movies || []);
         setShowSearchResults(true);
@@ -158,46 +177,50 @@ const TopNavbar = ({
         )}
 
         {/* Filter Dropdown */}
-        <div className="relative">
-          <button 
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className="flex items-center gap-3 px-5 py-2.5 
-              bg-gradient-to-r from-gold/15 to-gold-light/10 
-              hover:from-gold/20 hover:to-gold-light/15 
-              rounded-xl border border-gold/30 shadow-lg shadow-gold/10 transition-all"
-          >
-            <Film size={20} className="text-gold" />
-            <span className="text-white text-sm font-semibold">{filterType}</span>
-            <ChevronDown size={18} className={`text-gold/60 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
-          </button>
+{/* ADD ref={filterRef} TO THE PARENT CONTAINER */}
+      <div className="relative" ref={filterRef}>
+        <button 
+          onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+          className="flex items-center gap-3 px-5 py-2.5 
+            bg-gradient-to-r from-gold/15 to-gold-light/10 
+            hover:from-gold/20 hover:to-gold-light/15 
+            rounded-xl border border-gold/30 shadow-lg shadow-gold/10 transition-all"
+        >
+          <Film size={20} className="text-gold" />
+          <span className="text-white text-sm font-semibold">{filterType}</span>
+          <ChevronDown size={18} className={`text-gold/60 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+        </button>
 
-          {/* Filter Dropdown Menu */}
-          <AnimatePresence>
-            {showFilterDropdown && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl 
-                  border border-gold/30 rounded-xl overflow-hidden shadow-2xl shadow-black/50 z-50"
-              >
-                {filterOptions.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => handleFilterSelect(option)}
-                    className={`w-full px-4 py-3 text-left text-sm font-medium transition-all
-                      ${filterType === option 
-                        ? 'bg-gold/20 text-gold' 
-                        : 'text-white/80 hover:bg-white/10 hover:text-white'
-                      }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Filter Dropdown Menu */}
+        <AnimatePresence>
+          {showFilterDropdown && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl 
+                border border-gold/30 rounded-xl overflow-hidden shadow-2xl shadow-black/50 z-50"
+            >
+              {filterOptions.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => {
+                    handleFilterSelect(option);
+                    setShowFilterDropdown(false); // Optional: Close on selection too
+                  }}
+                  className={`w-full px-4 py-3 text-left text-sm font-medium transition-all
+                    ${filterType === option 
+                      ? 'bg-gold/20 text-gold' 
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
         {/* Search Bar */}
         <div className="flex-1 max-w-2xl relative" ref={searchRef}>
@@ -309,6 +332,7 @@ const TopNavbar = ({
 
         {/* Notifications & Profile */}
         <div className="flex items-center gap-4">
+          {/* TODO: Add notification functionality */}
 
           {/* Notifications */}
           <motion.button
