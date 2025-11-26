@@ -22,7 +22,6 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const progressBarRef = useRef(null);
   const controlsRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
-  const bandwidthMonitorRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -38,7 +37,6 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const [error, setError] = useState(null);
   const [buffering, setBuffering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
-  const [currentBandwidth, setCurrentBandwidth] = useState(0);
 
   // HLS video URL - pointing to master playlist
   const videoUrl = `http://localhost:5000/api/video/stream/${movieId}/master.m3u8`;
@@ -52,21 +50,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         debug: false,
         enableWorker: true,
         lowLatencyMode: false,
-        // Progressive loading - load segments one by one
-        maxBufferLength: 10,        // Only buffer 10 seconds ahead
-        maxMaxBufferLength: 20,     // Maximum 20 seconds buffer
-        maxBufferSize: 10 * 1000 * 1000,  // 10MB max buffer
-        maxBufferHole: 0.5,
-        backBufferLength: 10,       // Keep only 10 seconds behind
-        // Adaptive bitrate settings - continuous monitoring
-        abrEwmaDefaultEstimate: 500000,    // Start conservative (500 Kbps)
-        abrBandWidthFactor: 0.95,          // Use 95% of measured bandwidth
-        abrBandWidthUpFactor: 0.7,         // Be conservative going up
-        abrMaxWithRealBitrate: true,       // Don't exceed measured bandwidth
-        abrEwmaSlowVoD: 3,                 // Slower EWMA for VOD (more reactive)
-        abrEwmaFastVoD: 3,                 // Fast EWMA for quick adaptation
-        // Fragment loading strategy
-        startLevel: -1,                    // Start with auto quality
+        startLevel: -1,  // Auto quality - HLS.js handles ABR automatically
         autoStartLoad: true,
       });
 
@@ -99,10 +83,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         const quality = hls.levels[data.level];
         if (hls.autoLevelEnabled) {
-          const bandwidth = (hls.bandwidthEstimate / 1000000).toFixed(2);
-          setCurrentBandwidth(parseFloat(bandwidth));
-          setCurrentQuality(`Auto (${quality.height}p @ ${bandwidth}Mbps)`);
-          console.log(`[AUTO] Switched to ${quality.height}p | Bandwidth: ${bandwidth}Mbps`);
+          setCurrentQuality(`Auto (${quality.height}p)`);
         } else {
           setCurrentQuality(`${quality.height}p`);
         }
@@ -130,81 +111,15 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         }
       });
 
-      // Bandwidth monitoring for adaptive quality
-      hls.on(Hls.Events.FRAG_LOAD_PROGRESS, (event, data) => {
-        // Monitor download speed during fragment loading
-        const stats = data.stats;
-        if (stats && stats.loaded && stats.total) {
-          const progress = ((stats.loaded / stats.total) * 100).toFixed(1);
-          
-          // Calculate instantaneous download speed
-          if (stats.bwEstimate) {
-            const speed = (stats.bwEstimate / 1000000).toFixed(2);
-            
-            // If in auto mode and speed drops significantly, HLS will auto-adjust
-            if (hls.autoLevelEnabled && speed < 1) {
-              console.log(`[BANDWIDTH] Low speed detected: ${speed}Mbps - Auto adjusting...`);
-            }
-          }
-        }
-      });
-
-      hls.on(Hls.Events.FRAG_LOADING, (event, data) => {
-        // Only show buffering if video is actually waiting
+      hls.on(Hls.Events.FRAG_LOADING, () => {
         if (video.readyState < 3) {
           setBuffering(true);
         }
       });
 
-      hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+      hls.on(Hls.Events.FRAG_LOADED, () => {
         setBuffering(false);
-        
-        // Update bandwidth continuously
-        if (hls.bandwidthEstimate) {
-          const bandwidth = (hls.bandwidthEstimate / 1000000).toFixed(2);
-          setCurrentBandwidth(parseFloat(bandwidth));
-          
-          // Log bandwidth info for debugging
-          const stats = data.stats;
-          if (stats) {
-            const size = (stats.total / 1024).toFixed(0);
-            const duration = ((stats.loading.end - stats.loading.start) / 1000).toFixed(2);
-            console.log(`[SEGMENT] Loaded ${size}KB in ${duration}s | Est. bandwidth: ${bandwidth}Mbps`);
-          }
-        }
       });
-      
-      // Continuous bandwidth monitoring every 10 seconds
-      const startBandwidthMonitor = () => {
-        bandwidthMonitorRef.current = setInterval(() => {
-          if (hls && hls.autoLevelEnabled && hls.bandwidthEstimate) {
-            const currentBw = (hls.bandwidthEstimate / 1000000).toFixed(2);
-            const currentLevel = hls.levels[hls.currentLevel];
-            
-            setCurrentBandwidth(parseFloat(currentBw));
-            setCurrentQuality(`Auto (${currentLevel.height}p @ ${currentBw}Mbps)`);
-            
-            console.log(`[MONITOR] Bandwidth check: ${currentBw}Mbps | Current: ${currentLevel.height}p`);
-            
-            // Force quality re-evaluation based on current bandwidth
-            if (hls.autoLevelEnabled) {
-              const currentLevelBitrate = currentLevel.bitrate / 1000000;
-              const availableBw = parseFloat(currentBw);
-              
-              // If bandwidth is insufficient for current quality, force adjustment
-              if (availableBw < currentLevelBitrate * 1.1) {
-                console.log(`[MONITOR] Bandwidth (${currentBw}Mbps) too low for ${currentLevel.height}p (${currentLevelBitrate.toFixed(2)}Mbps) - Triggering quality adjustment`);
-                hls.nextLevel = -1; // Trigger ABR re-evaluation
-              }
-            }
-          }
-        }, 10000); // Check every 10 seconds
-      };
-      
-      // Start monitoring after manifest is loaded
-      if (hls.autoLevelEnabled) {
-        startBandwidthMonitor();
-      }
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = videoUrl;
@@ -220,9 +135,6 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       }
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
-      }
-      if (bandwidthMonitorRef.current) {
-        clearInterval(bandwidthMonitorRef.current);
       }
     };
   }, [videoUrl, movieId]);
@@ -327,20 +239,13 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
     const pos = (e.clientX - rect.left) / rect.width;
     const newTime = pos * duration;
     
-    // When seeking, show buffering immediately
     setBuffering(true);
     videoRef.current.currentTime = newTime;
-    
-    // HLS will now load only the necessary segments for the new position
-    if (hlsRef.current) {
-      console.log(`[SEEK] Jumped to ${newTime.toFixed(2)}s - Loading required segments only`);
-    }
   };
 
   const skip = (seconds) => {
     setBuffering(true);
     videoRef.current.currentTime += seconds;
-    console.log(`[SKIP] ${seconds > 0 ? '+' : ''}${seconds}s to ${videoRef.current.currentTime.toFixed(2)}s`);
   };
 
   const toggleFullscreen = () => {
@@ -358,48 +263,17 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       const wasPlaying = !videoRef.current.paused;
       const currentTimeBeforeSwitch = videoRef.current.currentTime;
       
-      // Stop bandwidth monitor if running
-      if (bandwidthMonitorRef.current) {
-        clearInterval(bandwidthMonitorRef.current);
-      }
-      
       if (qualityIndex === -1) {
-        // Enable adaptive bitrate
+        // Enable adaptive bitrate - HLS.js handles everything automatically
         hlsRef.current.currentLevel = -1;
         setCurrentQuality('Auto');
-        console.log('[QUALITY] Auto mode enabled - Will adapt based on bandwidth');
-        
-        // Restart bandwidth monitoring for auto mode
-        bandwidthMonitorRef.current = setInterval(() => {
-          if (hlsRef.current && hlsRef.current.autoLevelEnabled && hlsRef.current.bandwidthEstimate) {
-            const currentBw = (hlsRef.current.bandwidthEstimate / 1000000).toFixed(2);
-            const currentLevel = hlsRef.current.levels[hlsRef.current.currentLevel];
-            
-            setCurrentBandwidth(parseFloat(currentBw));
-            setCurrentQuality(`Auto (${currentLevel.height}p @ ${currentBw}Mbps)`);
-            
-            console.log(`[MONITOR] Bandwidth check: ${currentBw}Mbps | Current: ${currentLevel.height}p`);
-            
-            // Force quality re-evaluation if bandwidth is insufficient
-            const currentLevelBitrate = currentLevel.bitrate / 1000000;
-            const availableBw = parseFloat(currentBw);
-            
-            if (availableBw < currentLevelBitrate * 1.1) {
-              console.log(`[MONITOR] Bandwidth (${currentBw}Mbps) too low for ${currentLevel.height}p (${currentLevelBitrate.toFixed(2)}Mbps) - Forcing adjustment`);
-              hlsRef.current.nextLevel = -1;
-            }
-          }
-        }, 10000);
       } else {
-        // Manual quality selection - stop monitoring
+        // Manual quality selection
         hlsRef.current.currentLevel = qualityIndex;
         const quality = hlsRef.current.levels[qualityIndex];
         setCurrentQuality(`${quality.height}p`);
-        const bitrate = (quality.bitrate / 1000000).toFixed(2);
-        console.log(`[QUALITY] Manual: ${quality.height}p (${bitrate}Mbps) - Monitoring stopped`);
       }
       
-      // Show buffering during quality switch
       setBuffering(true);
       
       // Resume playback after quality switch
