@@ -12,7 +12,8 @@ import {
   Settings,
   SkipBack,
   SkipForward,
-  Loader
+  Loader,
+  AlertCircle
 } from 'lucide-react';
 
 const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
@@ -38,13 +39,16 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const [error, setError] = useState(null);
   const [buffering, setBuffering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
+  const [streamSource, setStreamSource] = useState('CloudFront');
 
-  // HLS video URL - pointing to master playlist
-  const videoUrl = `http://localhost:5000/api/video/stream/${movieId}/master.m3u8`;
+  // Hardcoded CloudFront URL for now
+  const videoUrl = 'https://d2k6afcpy0ja0m.cloudfront.net/movie-hls1/master.m3u8';
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    console.log(`🎬 Loading video from CloudFront: ${videoUrl}`);
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -53,6 +57,15 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         lowLatencyMode: false,
         startLevel: -1,  // Auto quality - HLS.js handles ABR automatically
         autoStartLoad: true,
+        // CloudFront optimized settings
+        maxBufferLength: 30,
+        maxMaxBufferLength: 600,
+        maxBufferSize: 60 * 1000 * 1000, // 60MB
+        maxBufferHole: 0.5,
+        // ABR settings for smooth quality switching
+        abrEwmaDefaultEstimate: 500000,
+        abrBandWidthFactor: 0.95,
+        abrBandWidthUpFactor: 0.7,
       });
 
       hlsRef.current = hls;
@@ -352,15 +365,35 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 
       {/* Error Overlay */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center px-6">
-            <p className="text-red-400 text-lg mb-2">⚠️ {error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-gold text-black rounded-lg font-semibold hover:bg-gold-light transition-colors"
-            >
-              Reload Page
-            </button>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/90">
+          <div className="text-center px-6 max-w-md">
+            <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
+            <p className="text-red-400 text-lg mb-2">{error}</p>
+            <p className="text-white/60 text-sm mb-4">
+              {streamSource === 'CloudFront' 
+                ? 'Unable to load stream from CloudFront. Please check your connection.'
+                : 'Unable to load video. The stream may not be available.'}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  setError(null);
+                  setIsLoading(true);
+                  if (hlsRef.current) {
+                    hlsRef.current.startLoad();
+                  }
+                }}
+                className="px-6 py-2 bg-gold text-black rounded-lg font-semibold hover:bg-gold-light transition-colors"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-white/10 text-white rounded-lg font-semibold hover:bg-white/20 transition-colors"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -537,7 +570,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 HLSVideoPlayer.propTypes = {
   movieId: PropTypes.string.isRequired,
   movieTitle: PropTypes.string.isRequired,
-  posterUrl: PropTypes.string
+  posterUrl: PropTypes.string,
 };
 
 export default HLSVideoPlayer;
