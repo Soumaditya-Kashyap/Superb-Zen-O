@@ -99,10 +99,8 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         const quality = hls.levels[data.level];
         if (hls.autoLevelEnabled) {
-          const bandwidth = (hls.bandwidthEstimate / 1000000).toFixed(2);
-          setCurrentBandwidth(parseFloat(bandwidth));
-          setCurrentQuality(`Auto (${quality.height}p @ ${bandwidth}Mbps)`);
-          console.log(`[AUTO] Switched to ${quality.height}p | Bandwidth: ${bandwidth}Mbps`);
+          setCurrentQuality(`Auto (${quality.height}p)`);
+          console.log(`[AUTO] Switched to ${quality.height}p`);
         } else {
           setCurrentQuality(`${quality.height}p`);
         }
@@ -178,22 +176,17 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       const startBandwidthMonitor = () => {
         bandwidthMonitorRef.current = setInterval(() => {
           if (hls && hls.autoLevelEnabled && hls.bandwidthEstimate) {
-            const currentBw = (hls.bandwidthEstimate / 1000000).toFixed(2);
             const currentLevel = hls.levels[hls.currentLevel];
             
-            setCurrentBandwidth(parseFloat(currentBw));
-            setCurrentQuality(`Auto (${currentLevel.height}p @ ${currentBw}Mbps)`);
-            
-            console.log(`[MONITOR] Bandwidth check: ${currentBw}Mbps | Current: ${currentLevel.height}p`);
+            setCurrentQuality(`Auto (${currentLevel.height}p)`);
             
             // Force quality re-evaluation based on current bandwidth
             if (hls.autoLevelEnabled) {
               const currentLevelBitrate = currentLevel.bitrate / 1000000;
-              const availableBw = parseFloat(currentBw);
+              const availableBw = hls.bandwidthEstimate / 1000000;
               
               // If bandwidth is insufficient for current quality, force adjustment
               if (availableBw < currentLevelBitrate * 1.1) {
-                console.log(`[MONITOR] Bandwidth (${currentBw}Mbps) too low for ${currentLevel.height}p (${currentLevelBitrate.toFixed(2)}Mbps) - Triggering quality adjustment`);
                 hls.nextLevel = -1; // Trigger ABR re-evaluation
               }
             }
@@ -372,20 +365,15 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         // Restart bandwidth monitoring for auto mode
         bandwidthMonitorRef.current = setInterval(() => {
           if (hlsRef.current && hlsRef.current.autoLevelEnabled && hlsRef.current.bandwidthEstimate) {
-            const currentBw = (hlsRef.current.bandwidthEstimate / 1000000).toFixed(2);
             const currentLevel = hlsRef.current.levels[hlsRef.current.currentLevel];
             
-            setCurrentBandwidth(parseFloat(currentBw));
-            setCurrentQuality(`Auto (${currentLevel.height}p @ ${currentBw}Mbps)`);
-            
-            console.log(`[MONITOR] Bandwidth check: ${currentBw}Mbps | Current: ${currentLevel.height}p`);
+            setCurrentQuality(`Auto (${currentLevel.height}p)`);
             
             // Force quality re-evaluation if bandwidth is insufficient
             const currentLevelBitrate = currentLevel.bitrate / 1000000;
-            const availableBw = parseFloat(currentBw);
+            const availableBw = hlsRef.current.bandwidthEstimate / 1000000;
             
             if (availableBw < currentLevelBitrate * 1.1) {
-              console.log(`[MONITOR] Bandwidth (${currentBw}Mbps) too low for ${currentLevel.height}p (${currentLevelBitrate.toFixed(2)}Mbps) - Forcing adjustment`);
               hlsRef.current.nextLevel = -1;
             }
           }
@@ -430,7 +418,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-video bg-black group"
+      className="relative w-full h-full bg-black group flex items-center justify-center"
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => {
@@ -446,7 +434,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       {/* Video Element */}
       <video
         ref={videoRef}
-        className="w-full h-full"
+        className="w-full h-full object-contain"
         poster={posterUrl}
         onClick={togglePlay}
         playsInline
@@ -507,20 +495,24 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
             exit={{ opacity: 0, y: 20 }}
             onMouseEnter={handleControlsMouseEnter}
             onMouseLeave={handleControlsMouseLeave}
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6 pb-4"
+            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
           >
             {/* Progress Bar */}
             <div
               ref={progressBarRef}
               onClick={handleProgressClick}
-              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-6 overflow-hidden hover:h-2 transition-all"
+              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-4 hover:h-2.5 transition-all group/progress relative"
             >
+              {/* Progress Fill */}
               <div
-                className="h-full bg-gold relative"
+                className="h-full bg-gold rounded-full"
                 style={{ width: `${(currentTime / duration) * 100}%` }}
-              >
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-gold rounded-full shadow-lg" />
-              </div>
+              />
+              {/* Rounded Head/Thumb */}
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
+                style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
+              />
             </div>
 
             <div className="flex items-center justify-between gap-4">
