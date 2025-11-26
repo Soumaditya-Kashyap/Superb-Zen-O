@@ -64,6 +64,8 @@ const WatchModeModal = ({ isOpen, onClose, onSelectMode, movieTitle }) => {
               </div>
             </motion.button>
 
+            
+
             {/* Watch Together */}
             <motion.button
               whileHover={{ scale: 1.02, y: -2 }}
