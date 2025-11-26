@@ -15,6 +15,11 @@ import MoviePlayer from './pages/MoviePlayer';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
+import AdminLogin from './admin/AdminLogin';
+import AdminRegister from './admin/AdminRegister';
+import AdminDashboard from './admin/AdminDashboard';
+
+
 // Protected Route Component
 function ProtectedRoute({ children, setIsAuthenticated }) {
   const token = localStorage.getItem('token');
@@ -135,6 +140,23 @@ function AppContent() {
           <Route path="*" element={
             <Navigate to={isAuthenticated ? "/" : "/auth"} replace />
           } />
+      
+      
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={
+            <AdminLogin setIsAdminAuthenticated={setIsAuthenticated} />
+          } />
+          <Route path="/admin/register" element={
+            <AdminRegister setIsAdminAuthenticated={setIsAuthenticated} />
+          } />
+          <Route path="/admin/dashboard" element={
+            isAuthenticated ? <AdminDashboard /> : <Navigate to="/admin/login" replace />
+          } />
+
+          
+          
+
+
         </Routes>
       </main>
     </div>

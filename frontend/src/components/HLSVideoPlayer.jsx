@@ -22,6 +22,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const progressBarRef = useRef(null);
   const controlsRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const bandwidthMonitorRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -120,6 +121,8 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       hls.on(Hls.Events.FRAG_LOADED, () => {
         setBuffering(false);
       });
+      
+      // HLS.js handles ABR automatically - no need for manual bandwidth monitoring
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = videoUrl;
@@ -135,6 +138,9 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       }
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+      }
+      if (bandwidthMonitorRef.current) {
+        clearInterval(bandwidthMonitorRef.current);
       }
     };
   }, [videoUrl, movieId]);
@@ -263,6 +269,12 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       const wasPlaying = !videoRef.current.paused;
       const currentTimeBeforeSwitch = videoRef.current.currentTime;
       
+      // Clear any existing bandwidth monitor
+      if (bandwidthMonitorRef.current) {
+        clearInterval(bandwidthMonitorRef.current);
+        bandwidthMonitorRef.current = null;
+      }
+      
       if (qualityIndex === -1) {
         // Enable adaptive bitrate - HLS.js handles everything automatically
         hlsRef.current.currentLevel = -1;
@@ -304,7 +316,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-video bg-black group"
+      className="relative w-full h-full bg-black group flex items-center justify-center"
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => {
@@ -320,7 +332,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       {/* Video Element */}
       <video
         ref={videoRef}
-        className="w-full h-full"
+        className="w-full h-full object-contain"
         poster={posterUrl}
         onClick={togglePlay}
         playsInline
@@ -381,20 +393,24 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
             exit={{ opacity: 0, y: 20 }}
             onMouseEnter={handleControlsMouseEnter}
             onMouseLeave={handleControlsMouseLeave}
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6 pb-4"
+            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
           >
             {/* Progress Bar */}
             <div
               ref={progressBarRef}
               onClick={handleProgressClick}
-              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-6 overflow-hidden hover:h-2 transition-all"
+              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-4 hover:h-2.5 transition-all group/progress relative"
             >
+              {/* Progress Fill */}
               <div
-                className="h-full bg-gold relative"
+                className="h-full bg-gold rounded-full"
                 style={{ width: `${(currentTime / duration) * 100}%` }}
-              >
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-gold rounded-full shadow-lg" />
-              </div>
+              />
+              {/* Rounded Head/Thumb */}
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
+                style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
+              />
             </div>
 
             <div className="flex items-center justify-between gap-4">

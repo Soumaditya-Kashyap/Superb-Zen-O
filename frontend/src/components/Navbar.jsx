@@ -14,6 +14,7 @@ import { AiFillStar } from 'react-icons/ai';
 
 const Navbar = () => {
   const navItems = [
+
     { path: '/', icon: <Home />, label: 'Home' },
     { path: '/watch-together', icon: <Users />, label: 'Watch Together' },
     { path: '/chat', icon: <MessageCircle />, label: 'Chat' },
@@ -31,10 +32,14 @@ const Navbar = () => {
   return (
     <nav className="fixed left-0 top-0 h-screen w-20 glass-effect flex flex-col items-center py-5 z-[1000] border-r border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300 hover:w-56 hover:bg-black/60 group">
       {/* Logo Section */}
+
+
+
       <div className="mb-10 flex items-center justify-center gap-2.5 w-full px-5">
-        <div className="w-8 h-8 flex items-center justify-center">
+            
+        <div className="w-full h-9 flex items-center justify-center ml-12">
           <img 
-            src="/images/appLogo/icon-for-white.png" 
+            src="/images/appLogo/icon-for-dark.png" 
             alt="Superb" 
             className="w-full h-full object-contain"
             onError={(e) => {
@@ -44,10 +49,13 @@ const Navbar = () => {
               e.target.parentElement.appendChild(star);
             }}
           />
-        </div>
-        <span className="text-lg font-bold text-gold opacity-0 whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
+
+        <div className="ml-2">
+             <span className="text-lg font-bold text-gold opacity-0 whitespace-nowrap transition-opacity duration-300 group-hover:opacity-100">
           SUPERB
         </span>
+        </div>
+        </div>
       </div>
       
       {/* Main Navigation */}

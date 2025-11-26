@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import TopNavbar from '../components/TopNavbar';
 import { 
   ArrowLeft, 
   Heart,
@@ -21,9 +22,11 @@ const MoviePlayer = () => {
   
   const [movie, setMovie] = useState(null);
   const [relatedMovies, setRelatedMovies] = useState([]);
+  const [filteredRelatedMovies, setFilteredRelatedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [isSaved, setIsSaved] = useState(false);
+  const [currentFilter, setCurrentFilter] = useState('All Media');
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -159,6 +162,35 @@ const MoviePlayer = () => {
     }
   };
 
+  // Handle filter change for related movies
+  const handleFilterChange = (filter) => {
+    setCurrentFilter(filter);
+    
+    if (filter === 'All Media') {
+      setFilteredRelatedMovies(relatedMovies);
+      return;
+    }
+
+    const filterLower = filter.toLowerCase();
+    const filtered = relatedMovies.filter(movie => {
+      const genre = (movie.Genre || '').toLowerCase();
+      const type = (movie.Type || '').toLowerCase();
+      
+      if (filter === 'Movies') return type === 'movie' || type === '';
+      if (filter === 'Series') return type === 'series';
+      
+      // Genre filters
+      return genre.includes(filterLower);
+    });
+
+    setFilteredRelatedMovies(filtered);
+  };
+
+  // Update filtered movies when related movies change
+  useEffect(() => {
+    setFilteredRelatedMovies(relatedMovies);
+  }, [relatedMovies]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -192,7 +224,14 @@ const MoviePlayer = () => {
 
   return (
     <div className="min-h-screen bg-black">
+      <TopNavbar 
+        showBackButton={true} 
+        onFilterChange={handleFilterChange}
+        currentFilter={currentFilter}
+      />
+
       {/* Back Button - Always visible */}
+{/*   
       <motion.button
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -202,27 +241,31 @@ const MoviePlayer = () => {
         className="fixed top-6 left-24 z-50 p-3 bg-black/80 backdrop-blur-xl border border-gold/30 rounded-xl hover:bg-gold/20 transition-all shadow-lg"
       >
         <ArrowLeft size={24} className="text-gold" />
-      </motion.button>
+      </motion.button> */}
 
       {/* HLS Video Player Section */}
-      <div className="max-w-[95%] xl:max-w-7xl mx-auto px-4 pt-24 pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl overflow-hidden shadow-2xl shadow-gold/20 border-2 border-gold/30 bg-gradient-to-b from-gold/5 to-transparent p-2"
-        >
-          <div className="rounded-xl overflow-hidden">
-            <HLSVideoPlayer
-              movieId={imdbId}
-              movieTitle={movie.Title}
-              posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
-            />
-          </div>
-        </motion.div>
-      </div>
+{/* HLS Video Player Section */}
+<div className="w-[95%] mx-auto pt-20 pb-6">
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="relative rounded-2xl overflow-hidden shadow-2xl shadow-gold/20 
+               border-2 border-gold/30 bg-black"
+    style={{ height: "calc(100vh - 140px)" }}
+  >
+    <HLSVideoPlayer
+      movieId={imdbId}
+      movieTitle={movie.Title}
+      posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
+    />
+  </motion.div>
+</div>
+
+
+
 
       {/* Content Section */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         {/* Movie Title & Info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -411,22 +454,41 @@ const MoviePlayer = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-2xl font-bold text-white mb-6">More Like This</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-              {relatedMovies.map((relatedMovie, idx) => (
-                <motion.div
-                  key={relatedMovie.imdbID}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 + idx * 0.05 }}
-                >
-                  <MovieCard
-                    movie={relatedMovie}
-                    onClick={(movie) => navigate(`/player/${movie.imdbID}`)}
-                  />
-                </motion.div>
-              ))}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">More Like This</h2>
+              {currentFilter !== 'All Media' && (
+                <span className="px-3 py-1 bg-gold/20 text-gold rounded-full text-sm">
+                  Filtered: {currentFilter}
+                </span>
+              )}
             </div>
+            {filteredRelatedMovies.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {filteredRelatedMovies.map((relatedMovie, idx) => (
+                  <motion.div
+                    key={relatedMovie.imdbID}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 + idx * 0.05 }}
+                  >
+                    <MovieCard
+                      movie={relatedMovie}
+                      onClick={(movie) => navigate(`/player/${movie.imdbID}`)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-white/60">No movies found for "{currentFilter}" filter</p>
+                <button 
+                  onClick={() => handleFilterChange('All Media')}
+                  className="mt-4 px-6 py-2 bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition-colors"
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
