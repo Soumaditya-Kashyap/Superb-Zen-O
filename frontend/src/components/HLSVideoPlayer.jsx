@@ -26,7 +26,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(0.4);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -173,6 +173,12 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       video.removeEventListener('canplay', handleCanPlay);
     };
   }, []);
+  // Sync video element volume with state
+  useEffect(() => {
+  if (videoRef.current) {
+    videoRef.current.volume = volume;
+  }
+}, [volume]);
 
   // Controls visibility - keep visible when hovering
   const handleMouseMove = () => {
@@ -384,152 +390,169 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       )}
 
       {/* Controls */}
-      <AnimatePresence>
-        {showControls && !isLoading && (
-          <motion.div
-            ref={controlsRef}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            onMouseEnter={handleControlsMouseEnter}
-            onMouseLeave={handleControlsMouseLeave}
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
+<AnimatePresence>
+  {showControls && !isLoading && (
+    <motion.div
+      ref={controlsRef}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      onMouseEnter={handleControlsMouseEnter}
+      onMouseLeave={handleControlsMouseLeave}
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
+    >
+      {/* --- Progress Bar + Time --- */}
+      <div className="flex items-center gap-4 mb-4">
+        
+        {/* Progress Bar (flex-1 makes it fill the space) */}
+        <div
+          ref={progressBarRef}
+          onClick={handleProgressClick}
+          className="flex-1 h-1.5 bg-white/20 rounded-full cursor-pointer hover:h-2.5 transition-all group/progress relative"
+        >
+          {/* Progress Fill */}
+          <div
+            className="h-full bg-gold rounded-full"
+            // Guard against division by zero in progress fill.
+
+            // style={{ width: `${(currentTime / duration) * 100}%` }}
+            style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+          />
+          {/* Rounded Head/Thumb */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
+            
+            // Guard against division by zero in thumb positioning.
+            // style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
+            style={{ left: `calc(${duration > 0 ? (currentTime / duration) * 100 : 0}% - 8px)` }}
+          />
+        </div>
+
+        {/* Time Display */}
+        <span className="text-white text-sm font-medium whitespace-nowrap min-w-[80px] text-right">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </span>
+      </div>
+
+      {/* --- Control Buttons --- */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Left Controls */}
+        <div className="flex items-center gap-3">
+          {/* Play/Pause */}
+          <button
+            onClick={togglePlay}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
-            {/* Progress Bar */}
-            <div
-              ref={progressBarRef}
-              onClick={handleProgressClick}
-              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-4 hover:h-2.5 transition-all group/progress relative"
+            {isPlaying ? (
+              <Pause size={24} className="text-white" fill="white" />
+            ) : (
+              <Play size={24} className="text-white" fill="white" />
+            )}
+          </button>
+
+          {/* Skip Back */}
+          <button
+            onClick={() => skip(-10)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <SkipBack size={20} className="text-white" />
+          </button>
+
+          {/* Skip Forward */}
+          <button
+            onClick={() => skip(10)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <SkipForward size={20} className="text-white" />
+          </button>
+
+          {/* Volume Control */}
+          <div className="flex items-center gap-2 group/volume">
+            <button
+              onClick={toggleMute}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              {/* Progress Fill */}
-              <div
-                className="h-full bg-gold rounded-full"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-              {/* Rounded Head/Thumb */}
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
-                style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
-              />
-            </div>
+              {isMuted || volume === 0 ? (
+                <VolumeX size={24} className="text-white" />
+              ) : (
+                <Volume2 size={24} className="text-white" />
+              )}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="w-0 group-hover/volume:w-20 transition-all accent-gold"
+            />
+          </div>
+        </div>
 
-            <div className="flex items-center justify-between gap-4">
-              {/* Left Controls */}
-              <div className="flex items-center gap-3">
-                {/* Play/Pause */}
+        {/* Right Controls */}
+        <div className="flex items-center gap-2">
+          {/* Quality Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowQualityMenu(!showQualityMenu)}
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Settings size={20} className="text-white" />
+              <span className="text-white text-sm font-semibold">
+                {currentQuality}
+              </span>
+            </button>
+
+            {showQualityMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden min-w-[120px]"
+              >
                 <button
-                  onClick={togglePlay}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={() => changeQuality(-1)}
+                  className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
+                    currentQuality === "Auto"
+                      ? "bg-gold/30 text-gold"
+                      : "text-white"
+                  }`}
                 >
-                  {isPlaying ? (
-                    <Pause size={24} className="text-white" fill="white" />
-                  ) : (
-                    <Play size={24} className="text-white" fill="white" />
-                  )}
+                  Auto
                 </button>
-
-                {/* Skip Back */}
-                <button
-                  onClick={() => skip(-10)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <SkipBack size={20} className="text-white" />
-                </button>
-
-                {/* Skip Forward */}
-                <button
-                  onClick={() => skip(10)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <SkipForward size={20} className="text-white" />
-                </button>
-
-                {/* Volume */}
-                <div className="flex items-center gap-2 group/volume">
+                {availableQualities.map((quality) => (
                   <button
-                    onClick={toggleMute}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    key={quality.index}
+                    onClick={() => changeQuality(quality.index)}
+                    className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
+                      currentQuality === quality.label
+                        ? "bg-gold/30 text-gold"
+                        : "text-white"
+                    }`}
                   >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX size={24} className="text-white" />
-                    ) : (
-                      <Volume2 size={24} className="text-white" />
-                    )}
+                    {quality.label}
                   </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={volume}
-                    onChange={handleVolumeChange}
-                    className="w-0 group-hover/volume:w-20 transition-all accent-gold"
-                  />
-                </div>
+                ))}
+              </motion.div>
+            )}
+          </div>
 
-                {/* Time */}
-                <span className="text-white text-sm font-medium">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-
-              {/* Right Controls */}
-              <div className="flex items-center gap-2">
-                {/* Quality Selector */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowQualityMenu(!showQualityMenu)}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <Settings size={20} className="text-white" />
-                    <span className="text-white text-sm font-semibold">{currentQuality}</span>
-                  </button>
-
-                  {showQualityMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden min-w-[120px]"
-                    >
-                      <button
-                        onClick={() => changeQuality(-1)}
-                        className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
-                          currentQuality === 'Auto' ? 'bg-gold/30 text-gold' : 'text-white'
-                        }`}
-                      >
-                        Auto
-                      </button>
-                      {availableQualities.map((quality) => (
-                        <button
-                          key={quality.index}
-                          onClick={() => changeQuality(quality.index)}
-                          className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
-                            currentQuality === quality.label ? 'bg-gold/30 text-gold' : 'text-white'
-                          }`}
-                        >
-                          {quality.label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Fullscreen */}
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  {isFullscreen ? (
-                    <Minimize size={24} className="text-white" />
-                  ) : (
-                    <Maximize size={24} className="text-white" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* Fullscreen */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            {isFullscreen ? (
+              <Minimize size={24} className="text-white" />
+            ) : (
+              <Maximize size={24} className="text-white" />
+            )}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
     </div>
   );
 };

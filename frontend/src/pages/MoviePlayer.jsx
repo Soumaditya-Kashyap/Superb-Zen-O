@@ -175,8 +175,10 @@ const MoviePlayer = () => {
     const filtered = relatedMovies.filter(movie => {
       const genre = (movie.Genre || '').toLowerCase();
       const type = (movie.Type || '').toLowerCase();
-      
-      if (filter === 'Movies') return type === 'movie' || type === '';
+
+      // Clarify empty type handling logic.
+      // if (filter === 'Movies') return type === 'movie' || type === '';
+      if (filter === 'Movies') return type === 'movie';
       if (filter === 'Series') return type === 'series';
       
       // Genre filters
@@ -188,6 +190,8 @@ const MoviePlayer = () => {
 
   // Update filtered movies when related movies change
   useEffect(() => {
+    // Fix state synchronization between currentFilter and filteredRelatedMovies.
+    setCurrentFilter('All Media');
     setFilteredRelatedMovies(relatedMovies);
   }, [relatedMovies]);
 
@@ -230,9 +234,9 @@ const MoviePlayer = () => {
         currentFilter={currentFilter}
       />
 
-      {/* Back Button - Always visible */}
-{/*   
-      <motion.button
+      {/* Back Button - Always visible not needed anymore */}
+  
+      {/* <motion.button
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         whileHover={{ scale: 1.05 }}
@@ -243,7 +247,7 @@ const MoviePlayer = () => {
         <ArrowLeft size={24} className="text-gold" />
       </motion.button> */}
 
-      {/* HLS Video Player Section */}
+     
 {/* HLS Video Player Section */}
 <div className="w-[95%] mx-auto pt-20 pb-6">
   <motion.div

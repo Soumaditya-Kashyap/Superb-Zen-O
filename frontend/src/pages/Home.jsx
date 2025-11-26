@@ -280,8 +280,8 @@ const Home = () => {
       const filteredMovies = category.movies.filter(movie => {
         const genre = (movie.Genre || '').toLowerCase();
         const type = (movie.Type || '').toLowerCase();
-        
-        if (filter === 'Movies') return type === 'movie' || type === '';
+        // fallback logic for missing Type field.
+        if (filter === 'Movies') return type === 'movie';
         if (filter === 'Series') return type === 'series';
         
         // Genre filters

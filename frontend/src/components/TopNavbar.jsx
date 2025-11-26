@@ -68,15 +68,15 @@ const TopNavbar = ({
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-
     if (searchQuery.trim().length < 2) {
       setSearchResults([]);
       setShowSearchResults(false);
+      setIsSearching(false);
       return;
     }
 
     setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {
+    setIsSearching(true);    searchTimeoutRef.current = setTimeout(async () => {
       try {
         const results = await MovieService.searchMovies(searchQuery);
         setSearchResults(results.movies || []);
@@ -263,9 +263,13 @@ const TopNavbar = ({
                           src={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
                           alt={movie.Title}
                           className="w-full h-full object-cover"
-                          onError={(e) => e.target.src = '/placeholder-movie.jpg'}
-                        />
-                      </div>
+                          onError={(e) => {
+                            if (e.target.src !== '/placeholder-movie.jpg') {
+                              e.target.src = '/placeholder-movie.jpg';
+                            }
+                          }}
+                        />                     
+                        </div>
                       
                       {/* Movie Info */}
                       <div className="flex-1 text-left">
