@@ -22,9 +22,11 @@ const MoviePlayer = () => {
   
   const [movie, setMovie] = useState(null);
   const [relatedMovies, setRelatedMovies] = useState([]);
+  const [filteredRelatedMovies, setFilteredRelatedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [isSaved, setIsSaved] = useState(false);
+  const [currentFilter, setCurrentFilter] = useState('All Media');
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -160,6 +162,35 @@ const MoviePlayer = () => {
     }
   };
 
+  // Handle filter change for related movies
+  const handleFilterChange = (filter) => {
+    setCurrentFilter(filter);
+    
+    if (filter === 'All Media') {
+      setFilteredRelatedMovies(relatedMovies);
+      return;
+    }
+
+    const filterLower = filter.toLowerCase();
+    const filtered = relatedMovies.filter(movie => {
+      const genre = (movie.Genre || '').toLowerCase();
+      const type = (movie.Type || '').toLowerCase();
+      
+      if (filter === 'Movies') return type === 'movie' || type === '';
+      if (filter === 'Series') return type === 'series';
+      
+      // Genre filters
+      return genre.includes(filterLower);
+    });
+
+    setFilteredRelatedMovies(filtered);
+  };
+
+  // Update filtered movies when related movies change
+  useEffect(() => {
+    setFilteredRelatedMovies(relatedMovies);
+  }, [relatedMovies]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -193,7 +224,11 @@ const MoviePlayer = () => {
 
   return (
     <div className="min-h-screen bg-black">
-      <TopNavbar showBackButton={true} />
+      <TopNavbar 
+        showBackButton={true} 
+        onFilterChange={handleFilterChange}
+        currentFilter={currentFilter}
+      />
 
       {/* Back Button - Always visible */}
 {/*   
@@ -209,23 +244,20 @@ const MoviePlayer = () => {
       </motion.button> */}
 
       {/* HLS Video Player Section */}
-{/* HLS Video Player Section – width 95% & height 85% */}
-<div className="w-[95%] mx-auto pt-24 pb-8">
+{/* HLS Video Player Section */}
+<div className="w-[95%] mx-auto pt-20 pb-6">
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     className="relative rounded-2xl overflow-hidden shadow-2xl shadow-gold/20 
-               border-2 border-gold/30 bg-gradient-to-b from-gold/5 to-transparent p-2"
-    style={{ height: "88vh" }}   // 👈 UPDATED height
+               border-2 border-gold/30 bg-black"
+    style={{ height: "calc(100vh - 140px)" }}
   >
-    <div className="rounded-xl overflow-hidden h-full">
-      <HLSVideoPlayer
-        movieId={imdbId}
-        movieTitle={movie.Title}
-        posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
-        height="100%"
-      />
-    </div>
+    <HLSVideoPlayer
+      movieId={imdbId}
+      movieTitle={movie.Title}
+      posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
+    />
   </motion.div>
 </div>
 
@@ -422,22 +454,41 @@ const MoviePlayer = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-2xl font-bold text-white mb-6">More Like This</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-              {relatedMovies.map((relatedMovie, idx) => (
-                <motion.div
-                  key={relatedMovie.imdbID}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 + idx * 0.05 }}
-                >
-                  <MovieCard
-                    movie={relatedMovie}
-                    onClick={(movie) => navigate(`/player/${movie.imdbID}`)}
-                  />
-                </motion.div>
-              ))}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">More Like This</h2>
+              {currentFilter !== 'All Media' && (
+                <span className="px-3 py-1 bg-gold/20 text-gold rounded-full text-sm">
+                  Filtered: {currentFilter}
+                </span>
+              )}
             </div>
+            {filteredRelatedMovies.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {filteredRelatedMovies.map((relatedMovie, idx) => (
+                  <motion.div
+                    key={relatedMovie.imdbID}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 + idx * 0.05 }}
+                  >
+                    <MovieCard
+                      movie={relatedMovie}
+                      onClick={(movie) => navigate(`/player/${movie.imdbID}`)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-white/60">No movies found for "{currentFilter}" filter</p>
+                <button 
+                  onClick={() => handleFilterChange('All Media')}
+                  className="mt-4 px-6 py-2 bg-gold/20 text-gold rounded-lg hover:bg-gold/30 transition-colors"
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
