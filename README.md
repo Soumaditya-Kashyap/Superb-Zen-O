@@ -9,7 +9,6 @@ Watch movies together with friends in real-time with synchronized playback and v
 ### Prerequisites
 - Node.js (v18+)
 - Git
-
 ### Installation
 
 1. Clone and navigate:
