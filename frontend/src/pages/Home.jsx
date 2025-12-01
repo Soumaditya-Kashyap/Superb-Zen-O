@@ -32,46 +32,71 @@ const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showHeroWatchModal, setShowHeroWatchModal] = useState(false);
   const [selectedHeroMovie, setSelectedHeroMovie] = useState(null);
+  const [heroSlides, setHeroSlides] = useState([]);
+  const [heroLoading, setHeroLoading] = useState(true);
 
-  // Hero carousel data
-  const heroSlides = [
-      {
-      id: 1,
-      title: "Roi Roi Binale",
-      subtitle: "The Ultimate Showdown",
-      description: "An action-packed thriller that keeps you on the edge",
-      image: "https://ik.imagekit.io/tjwfni5wku/roiroibinale.jpeg?updatedAt=1764192546167",
-      tags: ["2h 15min", "Action", "Movie", "2025", "13+"],
-      imdbID: "tt1234567" // Placeholder ID for hero movies without IMDb
-    },
-    {
-      id: 2,
-      title: "How to Train Your Dragon",
-      subtitle: "The Final Chapter",
-      description: "Experience the epic conclusion of the beloved trilogy",
-      image: "https://ik.imagekit.io/tjwfni5wku/howtotraindrogon.jpeg?updatedAt=1764192736781",
-      tags: ["1h 56min", "Action", "Movie", "2025", "6+"],
-      imdbID: "tt2386490"
-    },
-    {
-      id: 3,
-      title: "Padmavat",
-      subtitle: "A Royal Saga",
-      description: "Witness the legendary tale of honor and sacrifice",
-      image: "https://ik.imagekit.io/tjwfni5wku/padmaavai.jpeg?updatedAt=1764192671091",
-      tags: ["2h 44min", "Drama", "Movie", "2018", "13+"],
-      imdbID: "tt5935704"
-    }
-  ];
+  // Fetch hero movies from database
+  useEffect(() => {
+    const fetchHeroMovies = async () => {
+      try {
+        setHeroLoading(true);
+        console.log('🎬 Home: Fetching hero movies from database...');
+        
+        const response = await MovieService.getHeroMovies();
+        console.log('📦 Home: Hero response received:', response);
+        
+        if (response && response.success && response.heroMovies && response.heroMovies.length > 0) {
+          console.log(`✅ Home: Loaded ${response.heroMovies.length} hero movies`);
+          console.log('🎬 Hero movies:', response.heroMovies.map(m => m.title));
+          setHeroSlides(response.heroMovies);
+        } else {
+          console.log('⚠️  Home: No hero movies in response, using fallback');
+          console.log('📦 Full response:', JSON.stringify(response, null, 2));
+          // Fallback hero slides if database is empty
+          setHeroSlides([
+            {
+              id: 1,
+              title: "Welcome to Superb",
+              subtitle: "Your Entertainment Hub",
+              description: "Discover amazing movies and shows",
+              image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920",
+              tags: ["Movies", "Series", "Entertainment"],
+              imdbID: null
+            }
+          ]);
+        }
+      } catch (error) {
+        console.error('❌ Home: Error fetching hero movies:', error);
+        // Set fallback on error
+        setHeroSlides([
+          {
+            id: 1,
+            title: "Welcome to Superb",
+            subtitle: "Your Entertainment Hub", 
+            description: "Discover amazing movies and shows",
+            image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920",
+            tags: ["Movies", "Series", "Entertainment"],
+            imdbID: null
+          }
+        ]);
+      } finally {
+        setHeroLoading(false);
+      }
+    };
+
+    fetchHeroMovies();
+  }, []);
 
   // Auto-play carousel
   useEffect(() => {
+    if (heroSlides.length === 0) return;
+    
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
     }, 5000); // Change slide every 5 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [heroSlides.length]);
 
   useEffect(() => {
     const fetchPersonalizedMovies = async () => {
@@ -81,15 +106,15 @@ const Home = () => {
 
         if (!token) {
           console.log('📝 No token found, loading default categories');
-          const [trending, popular, action] = await Promise.all([
+          const [trending, comedy, action] = await Promise.all([
             MovieService.getMoviesByCategory('trending'),
-            MovieService.getMoviesByCategory('popular'),
+            MovieService.getMoviesByCategory('comedy'),
             MovieService.getMoviesByCategory('action'),
           ]);
           
           setMovieCategories([
             { title: 'Trending Now', movies: trending.movies || [] },
-            { title: 'Popular Movies', movies: popular.movies || [] },
+            { title: 'Comedy Movies', movies: comedy.movies || [] },
             { title: 'Action & Adventure', movies: action.movies || [] },
           ]);
           setLoading(false);
@@ -117,9 +142,8 @@ const Home = () => {
         console.log('📦 Backend response:', data);
 
         if (data.success) {
-          // Set username
+          // Log username
           if (data.userName) {
-            setUserName(data.userName);
             console.log('👤 Welcome back,', data.userName);
           }
 
@@ -193,14 +217,14 @@ const Home = () => {
         } else {
           console.log('❌ Failed to fetch personalized movies');
           // Fallback to default
-          const [trending, popular, action] = await Promise.all([
+          const [trending, comedy, action] = await Promise.all([
             MovieService.getMoviesByCategory('trending'),
-            MovieService.getMoviesByCategory('popular'),
+            MovieService.getMoviesByCategory('comedy'),
             MovieService.getMoviesByCategory('action'),
           ]);
           setMovieCategories([
             { title: 'Trending Now', movies: trending.movies || [] },
-            { title: 'Popular Movies', movies: popular.movies || [] },
+            { title: 'Comedy Movies', movies: comedy.movies || [] },
             { title: 'Action & Adventure', movies: action.movies || [] },
           ]);
         }
@@ -208,14 +232,14 @@ const Home = () => {
         console.error('❌ Error fetching personalized movies:', error);
         // Fallback to default categories
         try {
-          const [trending, popular, action] = await Promise.all([
+          const [trending, comedy, action] = await Promise.all([
             MovieService.getMoviesByCategory('trending'),
-            MovieService.getMoviesByCategory('popular'),
+            MovieService.getMoviesByCategory('comedy'),
             MovieService.getMoviesByCategory('action'),
           ]);
           setMovieCategories([
             { title: 'Trending Now', movies: trending.movies || [] },
-            { title: 'Popular Movies', movies: popular.movies || [] },
+            { title: 'Comedy Movies', movies: comedy.movies || [] },
             { title: 'Action & Adventure', movies: action.movies || [] },
           ]);
         } catch (fallbackError) {
@@ -315,9 +339,28 @@ const Home = () => {
 
         {/* Hero Carousel Section */}
         <div className="pt-28 px-8 pb-4">
+          {heroLoading ? (
+            // Hero Loading State
+            <div className="relative h-[520px] rounded-3xl overflow-hidden bg-gradient-to-br from-white/5 to-white/[0.02] border-4 border-white/20">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 border-4 border-gold/30 border-t-gold rounded-full animate-spin"></div>
+                  <p className="text-white/60 text-lg">Loading featured movies...</p>
+                </div>
+              </div>
+            </div>
+          ) : heroSlides.length === 0 ? (
+            // No Hero Movies State
+            <div className="relative h-[520px] rounded-3xl overflow-hidden bg-gradient-to-br from-white/5 to-white/[0.02] border-4 border-white/20">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white/60 text-lg">No featured movies available</p>
+              </div>
+            </div>
+          ) : (
           <div className="relative h-[520px] group">
             {/* Slides */}
             <AnimatePresence mode="wait">
+              {heroSlides[currentSlide] && (
               <motion.div
                 key={currentSlide}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -331,9 +374,13 @@ const Home = () => {
                   {/* Movie Poster - Full visibility */}
                   <div className="absolute inset-0">
                     <img 
-                      src={heroSlides[currentSlide].image}
-                      alt={heroSlides[currentSlide].title}
+                      src={heroSlides[currentSlide]?.image || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920'}
+                      alt={heroSlides[currentSlide]?.title || 'Featured Movie'}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.log('❌ Hero image failed to load:', heroSlides[currentSlide]?.image);
+                        e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1920';
+                      }}
                     />
                     {/* Subtle gradient only at bottom for text readability */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
@@ -349,7 +396,7 @@ const Home = () => {
                         transition={{ delay: 0.2 }}
                         className="flex items-center gap-2 flex-wrap"
                       >
-                        {heroSlides[currentSlide].tags.map((tag, index) => (
+                        {(heroSlides[currentSlide]?.tags || []).map((tag, index) => (
                           <span 
                             key={index}
                             className="px-3 py-1 bg-white/15 backdrop-blur-md border border-white/30 rounded-lg text-white text-xs font-semibold"
@@ -366,7 +413,7 @@ const Home = () => {
                         transition={{ delay: 0.3 }}
                         className="text-5xl font-bold text-white leading-tight drop-shadow-2xl"
                       >
-                        {heroSlides[currentSlide].title}
+                        {heroSlides[currentSlide]?.title || 'Featured Movie'}
                       </motion.h1>
 
                       {/* Subtitle */}
@@ -376,7 +423,7 @@ const Home = () => {
                         transition={{ delay: 0.4 }}
                         className="text-xl font-medium text-gold"
                       >
-                        {heroSlides[currentSlide].subtitle}
+                        {heroSlides[currentSlide]?.subtitle || ''}
                       </motion.p>
 
                       {/* Description */}
@@ -386,7 +433,7 @@ const Home = () => {
                         transition={{ delay: 0.5 }}
                         className="text-base text-white/90 leading-relaxed max-w-2xl"
                       >
-                        {heroSlides[currentSlide].description}
+                        {heroSlides[currentSlide]?.description || ''}
                       </motion.p>
 
                       {/* Buttons */}
@@ -418,6 +465,7 @@ const Home = () => {
                   </div>
                 </div>
               </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Navigation Dots */}
@@ -460,6 +508,7 @@ const Home = () => {
               {currentSlide + 1} / {heroSlides.length}
             </div>
           </div>
+          )}
         </div>
 
         {/* Movie Content */}

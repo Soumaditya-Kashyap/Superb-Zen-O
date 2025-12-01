@@ -57,6 +57,27 @@ const movieSchema = new mongoose.Schema({
         type: String,
         index: true
     }],
+    // Hero section fields
+    isHero: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    heroOrder: {
+        type: Number,
+        default: 0
+    },
+    heroSubtitle: {
+        type: String,
+        default: ''
+    },
+    heroDescription: {
+        type: String,
+        default: ''
+    },
+    heroTags: [{
+        type: String
+    }],
     scrapedAt: {
         type: Date,
         default: Date.now

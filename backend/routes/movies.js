@@ -3,6 +3,9 @@ const router = express.Router();
 const movieController = require('../controllers/movieController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
+// Hero section movies (public route - no auth required)
+router.get('/hero', movieController.getHeroMovies);
+
 // Search movies
 router.get('/search', movieController.searchMovies);
 
