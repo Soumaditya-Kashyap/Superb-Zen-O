@@ -12,7 +12,8 @@ import {
   Settings,
   SkipBack,
   SkipForward,
-  Loader
+  Loader,
+  AlertCircle
 } from 'lucide-react';
 
 const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
@@ -26,7 +27,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(0.4);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -38,13 +39,16 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const [error, setError] = useState(null);
   const [buffering, setBuffering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
+  const [streamSource, setStreamSource] = useState('CloudFront');
 
-  // HLS video URL - pointing to master playlist
-  const videoUrl = `http://localhost:5000/api/video/stream/${movieId}/master.m3u8`;
+  // Hardcoded CloudFront URL for now
+  const videoUrl = 'https://d2k6afcpy0ja0m.cloudfront.net/movie-hls1/master.m3u8';
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    console.log(`🎬 Loading video from CloudFront: ${videoUrl}`);
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -53,6 +57,15 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         lowLatencyMode: false,
         startLevel: -1,  // Auto quality - HLS.js handles ABR automatically
         autoStartLoad: true,
+        // CloudFront optimized settings
+        maxBufferLength: 30,
+        maxMaxBufferLength: 600,
+        maxBufferSize: 60 * 1000 * 1000, // 60MB
+        maxBufferHole: 0.5,
+        // ABR settings for smooth quality switching
+        abrEwmaDefaultEstimate: 500000,
+        abrBandWidthFactor: 0.95,
+        abrBandWidthUpFactor: 0.7,
       });
 
       hlsRef.current = hls;
@@ -173,6 +186,12 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       video.removeEventListener('canplay', handleCanPlay);
     };
   }, []);
+  // Sync video element volume with state
+  useEffect(() => {
+  if (videoRef.current) {
+    videoRef.current.volume = volume;
+  }
+}, [volume]);
 
   // Controls visibility - keep visible when hovering
   const handleMouseMove = () => {
@@ -352,15 +371,35 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 
       {/* Error Overlay */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center px-6">
-            <p className="text-red-400 text-lg mb-2">⚠️ {error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-gold text-black rounded-lg font-semibold hover:bg-gold-light transition-colors"
-            >
-              Reload Page
-            </button>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/90">
+          <div className="text-center px-6 max-w-md">
+            <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
+            <p className="text-red-400 text-lg mb-2">{error}</p>
+            <p className="text-white/60 text-sm mb-4">
+              {streamSource === 'CloudFront' 
+                ? 'Unable to load stream from CloudFront. Please check your connection.'
+                : 'Unable to load video. The stream may not be available.'}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  setError(null);
+                  setIsLoading(true);
+                  if (hlsRef.current) {
+                    hlsRef.current.startLoad();
+                  }
+                }}
+                className="px-6 py-2 bg-gold text-black rounded-lg font-semibold hover:bg-gold-light transition-colors"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-white/10 text-white rounded-lg font-semibold hover:bg-white/20 transition-colors"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -384,156 +423,174 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       )}
 
       {/* Controls */}
-      <AnimatePresence>
-        {showControls && !isLoading && (
-          <motion.div
-            ref={controlsRef}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            onMouseEnter={handleControlsMouseEnter}
-            onMouseLeave={handleControlsMouseLeave}
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
+<AnimatePresence>
+  {showControls && !isLoading && (
+    <motion.div
+      ref={controlsRef}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      onMouseEnter={handleControlsMouseEnter}
+      onMouseLeave={handleControlsMouseLeave}
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-6 py-4 pt-12"
+    >
+      {/* --- Progress Bar + Time --- */}
+      <div className="flex items-center gap-4 mb-4">
+        
+        {/* Progress Bar (flex-1 makes it fill the space) */}
+        <div
+          ref={progressBarRef}
+          onClick={handleProgressClick}
+          className="flex-1 h-1.5 bg-white/20 rounded-full cursor-pointer hover:h-2.5 transition-all group/progress relative"
+        >
+          {/* Progress Fill */}
+          <div
+            className="h-full bg-gold rounded-full"
+            // Guard against division by zero in progress fill.
+
+            // style={{ width: `${(currentTime / duration) * 100}%` }}
+            style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+          />
+          {/* Rounded Head/Thumb */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
+            
+            // Guard against division by zero in thumb positioning.
+            // style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
+            style={{ left: `calc(${duration > 0 ? (currentTime / duration) * 100 : 0}% - 8px)` }}
+          />
+        </div>
+
+        {/* Time Display */}
+        <span className="text-white text-sm font-medium whitespace-nowrap min-w-[80px] text-right">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </span>
+      </div>
+
+      {/* --- Control Buttons --- */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Left Controls */}
+        <div className="flex items-center gap-3">
+          {/* Play/Pause */}
+          <button
+            onClick={togglePlay}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
-            {/* Progress Bar */}
-            <div
-              ref={progressBarRef}
-              onClick={handleProgressClick}
-              className="w-full h-1.5 bg-white/20 rounded-full cursor-pointer mb-4 hover:h-2.5 transition-all group/progress relative"
+            {isPlaying ? (
+              <Pause size={24} className="text-white" fill="white" />
+            ) : (
+              <Play size={24} className="text-white" fill="white" />
+            )}
+          </button>
+
+          {/* Skip Back */}
+          <button
+            onClick={() => skip(-10)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <SkipBack size={20} className="text-white" />
+          </button>
+
+          {/* Skip Forward */}
+          <button
+            onClick={() => skip(10)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <SkipForward size={20} className="text-white" />
+          </button>
+
+          {/* Volume Control */}
+          <div className="flex items-center gap-2 group/volume">
+            <button
+              onClick={toggleMute}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              {/* Progress Fill */}
-              <div
-                className="h-full bg-gold rounded-full"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-              {/* Rounded Head/Thumb */}
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-gold rounded-full shadow-lg shadow-gold/50 border-2 border-white transition-transform hover:scale-125"
-                style={{ left: `calc(${(currentTime / duration) * 100}% - 8px)` }}
-              />
-            </div>
+              {isMuted || volume === 0 ? (
+                <VolumeX size={24} className="text-white" />
+              ) : (
+                <Volume2 size={24} className="text-white" />
+              )}
+            </button>
+            
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="w-0 group-hover/volume:w-20 transition-all accent-gold"
+            />
+            
+            {/* Added Volume Text */}
+            <span className="w-0 overflow-hidden opacity-0 group-hover/volume:w-6 group-hover/volume:opacity-100 transition-all text-white text-sm font-medium">
+               {Math.round(volume * 100)}
+            </span>
+          </div>
+        </div>
 
-            <div className="flex items-center justify-between gap-4">
-              {/* Left Controls */}
-              <div className="flex items-center gap-3">
-                {/* Play/Pause */}
+        {/* Right Controls */}
+        <div className="flex items-center gap-2">
+          {/* Quality Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowQualityMenu(!showQualityMenu)}
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Settings size={20} className="text-white" />
+              <span className="text-white text-sm font-semibold">
+                {currentQuality}
+              </span>
+            </button>
+
+            {showQualityMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden min-w-[120px]"
+              >
                 <button
-                  onClick={togglePlay}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={() => changeQuality(-1)}
+                  className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
+                    currentQuality.startsWith("Auto")
+                      ? "bg-gold/30 text-gold"
+                      : "text-white"
+                  }`}
                 >
-                  {isPlaying ? (
-                    <Pause size={24} className="text-white" fill="white" />
-                  ) : (
-                    <Play size={24} className="text-white" fill="white" />
-                  )}
+                  Auto
                 </button>
-
-                {/* Skip Back */}
-                <button
-                  onClick={() => skip(-10)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <SkipBack size={20} className="text-white" />
-                </button>
-
-                {/* Skip Forward */}
-                <button
-                  onClick={() => skip(10)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <SkipForward size={20} className="text-white" />
-                </button>
-
-                {/* Volume */}
-                <div className="flex items-center gap-2 group/volume">
+                {availableQualities.map((quality) => (
                   <button
-                    onClick={toggleMute}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    key={quality.index}
+                    onClick={() => changeQuality(quality.index)}
+                    className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
+                      currentQuality === quality.label
+                        ? "bg-gold/30 text-gold"
+                        : "text-white"
+                    }`}
                   >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX size={24} className="text-white" />
-                    ) : (
-                      <Volume2 size={24} className="text-white" />
-                    )}
+                    {quality.label}
                   </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={volume}
-                    onChange={handleVolumeChange}
-                    className="w-0 group-hover/volume:w-20 transition-all accent-gold"
-                  />
-                </div>
-
-                {/* Time */}
-                <span className="text-white text-sm font-medium">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-
-              {/* Right Controls */}
-              <div className="flex items-center gap-2">
-
-                
-                {/* Quality Selector */}
-                <div className="relative">
-
-
-                  <button
-                    onClick={() => setShowQualityMenu(!showQualityMenu)}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <Settings size={20} className="text-white" />
-                    <span className="text-white text-sm font-semibold">{currentQuality}</span>
-                  </button>
-
-                  {showQualityMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden min-w-[120px]"
-                    >
-                      <button
-                        onClick={() => changeQuality(-1)}
-                        className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
-                          currentQuality === 'Auto' ? 'bg-gold/30 text-gold' : 'text-white'
-                        }`}
-                      >
-                        Auto
-                      </button>
-                      {availableQualities.map((quality) => (
-                        <button
-                          key={quality.index}
-                          onClick={() => changeQuality(quality.index)}
-                          className={`w-full px-4 py-2 text-left hover:bg-gold/20 transition-colors ${
-                            currentQuality === quality.label ? 'bg-gold/30 text-gold' : 'text-white'
-                          }`}
-                        >
-                          {quality.label}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Fullscreen */}
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  {isFullscreen ? (
-                    <Minimize size={24} className="text-white" />
-                  ) : (
-                    <Maximize size={24} className="text-white" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                ))}
+              </motion.div>
+            )}
+          </div>
+          {/* Fullscreen */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            {isFullscreen ? (
+              <Minimize size={24} className="text-white" />
+            ) : (
+              <Maximize size={24} className="text-white" />
+            )}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
     </div>
   );
 };
@@ -541,7 +598,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 HLSVideoPlayer.propTypes = {
   movieId: PropTypes.string.isRequired,
   movieTitle: PropTypes.string.isRequired,
-  posterUrl: PropTypes.string
+  posterUrl: PropTypes.string,
 };
 
 export default HLSVideoPlayer;
