@@ -163,7 +163,7 @@ const Auth = ({ setIsAuthenticated }) => {
           <div className="w-full">
             <div className="glass-effect-dark rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
               <img 
-                src="https://ik.imagekit.io/tjwfni5wku/3942584.jpg"
+                src="/images/authScene/3942584.jpg"
                 alt="Your Friends Are Waiting" 
                 className="w-full h-[380px] object-cover"
               />

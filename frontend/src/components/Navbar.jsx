@@ -47,7 +47,7 @@ const Navbar = () => {
           </div>
           {/* Logo Text / Image */}
           <img
-            src="https://ik.imagekit.io/tjwfni5wku/superb-light.png"
+            src="https://ik.imagekit.io/ugweqp16c/images/appLogo/superb-light.png?updatedAt=1764608226250"
             alt="Superb"
             className="w-32 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
           />
