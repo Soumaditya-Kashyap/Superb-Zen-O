@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  Search,
-  Bell,
+ 
   ChevronDown,
   Film,
   ArrowUp,
@@ -19,15 +18,16 @@ import MovieDetails from '../components/MovieDetails';
 import WatchModeModal from '../components/WatchModeModal';
 import TopNavbar from '../components/TopNavbar';
 
+
+
+
 const Home = () => {
   const navigate = useNavigate();
   const [movieCategories, setMovieCategories] = useState([]);
   const [filteredCategories, setFilteredCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState(null);
-  const [userName, setUserName] = useState('User');
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All Media');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showHeroWatchModal, setShowHeroWatchModal] = useState(false);
@@ -40,7 +40,7 @@ const Home = () => {
       title: "Roi Roi Binale",
       subtitle: "The Ultimate Showdown",
       description: "An action-packed thriller that keeps you on the edge",
-      image: "/images/movie-posters/roiroibinale.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/roiroibinale.jpeg?updatedAt=1764192546167",
       tags: ["2h 15min", "Action", "Movie", "2025", "13+"],
       imdbID: "tt1234567" // Placeholder ID for hero movies without IMDb
     },
@@ -49,7 +49,7 @@ const Home = () => {
       title: "How to Train Your Dragon",
       subtitle: "The Final Chapter",
       description: "Experience the epic conclusion of the beloved trilogy",
-      image: "/images/movie-posters/image.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/howtotraindrogon.jpeg?updatedAt=1764192736781",
       tags: ["1h 56min", "Action", "Movie", "2025", "6+"],
       imdbID: "tt2386490"
     },
@@ -58,7 +58,7 @@ const Home = () => {
       title: "Padmavat",
       subtitle: "A Royal Saga",
       description: "Witness the legendary tale of honor and sacrifice",
-      image: "/images/movie-posters/padmavat.png",
+      image: "https://ik.imagekit.io/tjwfni5wku/padmaavai.jpeg?updatedAt=1764192671091",
       tags: ["2h 44min", "Drama", "Movie", "2018", "13+"],
       imdbID: "tt5935704"
     }
@@ -640,6 +640,7 @@ const Home = () => {
         )}
       </AnimatePresence>
       </div>
+   
     </div>
   );
 };
