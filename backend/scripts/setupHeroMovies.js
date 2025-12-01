@@ -10,7 +10,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const Movie = require('../models/Movie');
+const Movie = require('../models/movie.js');
 
 // Hero movies configuration - Using correct MongoDB ObjectIds
 const heroMoviesConfig = [
