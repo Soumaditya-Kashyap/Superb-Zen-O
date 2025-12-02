@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
-import { Play, Users, X, Star } from 'lucide-react';
+import { Play, Users, X, Star, Clock, AlertTriangle } from 'lucide-react';
 import MovieService from '../services/movieService';
 import WatchModeModal from './WatchModeModal';
 
@@ -78,6 +78,9 @@ const MovieDetails = ({ imdbId, onClose }) => {
   const posterUrl = movie.Poster && movie.Poster !== 'N/A' 
     ? movie.Poster 
     : 'https://via.placeholder.com/400x600?text=No+Poster';
+
+  // Check if movie has HLS streaming available
+  const isVideoAvailable = !!movie.videoFolderName;
 
   return (
     <>
@@ -176,20 +179,42 @@ const MovieDetails = ({ imdbId, onClose }) => {
                 )}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
+                {isVideoAvailable ? (
+                  <button 
+                    onClick={handleWatchNow}
+                    className="px-8 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2"
+                  >
+                    <Play size={20} fill="currentColor" /> Watch Now
+                  </button>
+                ) : (
+                  <button 
+                    disabled
+                    className="px-8 py-3 bg-gray-600/50 text-white/60 font-bold rounded-lg cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Clock size={20} /> Coming Soon
+                  </button>
+                )}
                 <button 
                   onClick={handleWatchNow}
-                  className="px-8 py-3 bg-gradient-to-r from-gold to-gold-light text-black font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-2"
-                >
-                  <Play size={20} fill="currentColor" /> Watch Now
-                </button>
-                <button 
-                  onClick={handleWatchNow}
-                  className="px-8 py-3 glass-effect text-white font-semibold rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+                  disabled={!isVideoAvailable}
+                  className={`px-8 py-3 glass-effect font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+                    isVideoAvailable 
+                      ? 'text-white hover:bg-white/20' 
+                      : 'text-white/40 cursor-not-allowed'
+                  }`}
                 >
                   <Users size={20} /> Watch Together
                 </button>
               </div>
+              
+              {/* Availability Status Badge */}
+              {!isVideoAvailable && (
+                <div className="mt-4 flex items-center gap-2 text-amber-400/80 bg-amber-400/10 px-4 py-2 rounded-lg w-fit">
+                  <AlertTriangle size={16} />
+                  <span className="text-sm">This movie is not yet available for streaming</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

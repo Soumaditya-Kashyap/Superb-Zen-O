@@ -8,6 +8,7 @@ const TopNavbar = ({
   showBackButton = false, 
   onFilterChange, 
   onSearchChange,
+  onMovieSelect,
   currentFilter = "All Media" 
 }) => {
   const navigate = useNavigate();
@@ -146,7 +147,13 @@ const TopNavbar = ({
   const handleMovieClick = (movie) => {
     setShowSearchResults(false);
     setSearchQuery("");
-    navigate(`/player/${movie.imdbID}`);
+    // If onMovieSelect callback is provided, use it (opens MovieDetails modal)
+    // Otherwise, navigate directly to player (legacy behavior)
+    if (onMovieSelect) {
+      onMovieSelect(movie.imdbID);
+    } else {
+      navigate(`/player/${movie.imdbID}`);
+    }
   };
 
   const clearSearch = () => {

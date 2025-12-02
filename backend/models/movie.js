@@ -78,6 +78,11 @@ const movieSchema = new mongoose.Schema({
     heroTags: [{
         type: String
     }],
+    // HLS Streaming field - stores the folder name in S3/CloudFront (e.g., "movie-hls1")
+    videoFolderName: {
+        type: String,
+        default: null
+    },
     scrapedAt: {
         type: Date,
         default: Date.now

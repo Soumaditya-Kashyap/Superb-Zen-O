@@ -16,7 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
+const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const containerRef = useRef(null);
@@ -41,14 +41,11 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
   const [isHoveringControls, setIsHoveringControls] = useState(false);
   const [streamSource, setStreamSource] = useState('CloudFront');
 
-  // Hardcoded CloudFront URL for now
-  const videoUrl = 'https://d2k6afcpy0ja0m.cloudfront.net/movie-hls1/master.m3u8';
-
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !streamUrl) return;
 
-    console.log(`🎬 Loading video from CloudFront: ${videoUrl}`);
+    console.log(`🎬 Loading video from CloudFront: ${streamUrl}`);
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -70,7 +67,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 
       hlsRef.current = hls;
 
-      hls.loadSource(videoUrl);
+      hls.loadSource(streamUrl);
       hls.attachMedia(video);
 
       // HLS Events
@@ -138,7 +135,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
       // HLS.js handles ABR automatically - no need for manual bandwidth monitoring
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = videoUrl;
+      video.src = streamUrl;
       setIsLoading(false);
     } else {
       setError('Your browser does not support HLS video playback');
@@ -156,7 +153,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
         clearInterval(bandwidthMonitorRef.current);
       }
     };
-  }, [videoUrl, movieId]);
+  }, [streamUrl]);
 
   // Video event listeners
   useEffect(() => {
@@ -596,7 +593,7 @@ const HLSVideoPlayer = ({ movieId, movieTitle, posterUrl }) => {
 };
 
 HLSVideoPlayer.propTypes = {
-  movieId: PropTypes.string.isRequired,
+  streamUrl: PropTypes.string.isRequired,
   movieTitle: PropTypes.string.isRequired,
   posterUrl: PropTypes.string,
 };

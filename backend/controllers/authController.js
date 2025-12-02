@@ -25,14 +25,14 @@ exports.register = async (req, res) => {
     try {
         const { name, email, nickName, phone, password, confirmPassword, languages, genres } = req.body;
         
-        console.log('📝 New registration attempt for:', email);
-        console.log('👤 NickName:', nickName);
-        console.log('🌍 Languages:', languages);
-        console.log('🎬 Genres:', genres);
+        console.log('[AUTH] Registration attempt for: ' + email);
+        console.log('[AUTH] NickName: ' + nickName);
+        console.log('[AUTH] Languages: ' + (languages || []).join(', '));
+        console.log('[AUTH] Genres: ' + (genres || []).join(', '));
 
         // Validate required fields
         if (!name || !email || !nickName || !phone || !password) {
-            console.log('❌ Registration failed: Missing required fields');
+            console.log('[AUTH] Registration failed: Missing required fields');
             return res.status(400).json({ 
                 success: false,
                 message: "All fields are required" 
@@ -89,8 +89,8 @@ exports.register = async (req, res) => {
         // Set cookie
         setTokenCookie(res, token);
         
-        console.log('✅ User registered successfully:', user.email);
-        console.log('🎉 Preferences saved:', { languages: user.preferences.languages, genres: user.preferences.genres });
+        console.log('[AUTH] User registered successfully: ' + user.email);
+        console.log('[AUTH] Preferences saved - Languages: ' + user.preferences.languages.join(', ') + ', Genres: ' + user.preferences.genres.join(', '));
 
         return res.status(201).json({
             success: true,
@@ -108,7 +108,7 @@ exports.register = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Registration error:', error);
+        console.error('[AUTH] Registration error:', error.message);
         return res.status(500).json({ 
             success: false,
             message: "Error registering user",
@@ -121,19 +121,19 @@ exports.register = async (req, res) => {
 exports.getPreferences = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log('📋 Fetching preferences for user:', userId);
+        console.log('[AUTH] Fetching preferences for user: ' + userId);
 
         const user = await User.findById(userId);
 
         if (!user) {
-            console.log('❌ User not found');
+            console.log('[AUTH] User not found');
             return res.status(404).json({
                 success: false,
                 message: "User not found"
             });
         }
         
-        console.log('✅ Preferences found:', user.preferences);
+        console.log('[AUTH] Preferences found for ' + user.nickName);
 
         res.status(200).json({
             success: true,
@@ -141,7 +141,7 @@ exports.getPreferences = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get preferences error:', error);
+        console.error('[AUTH] Get preferences error:', error.message);
         return res.status(500).json({
             success: false,
             message: "Error fetching preferences",
@@ -195,11 +195,11 @@ exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
         
-        console.log('🔐 Login attempt for:', email);
+        console.log('[AUTH] Login attempt for: ' + email);
 
         // Validate input
         if (!email || !password) {
-            console.log('❌ Login failed: Missing credentials');
+            console.log('[AUTH] Login failed: Missing credentials');
             return res.status(400).json({ 
                 success: false,
                 message: "Email and password are required" 
@@ -209,6 +209,7 @@ exports.login = async (req, res) => {
         // Find user
         const user = await User.findOne({ email: email.toLowerCase() });
         if (!user) {
+            console.log('[AUTH] Login failed: User not found');
             return res.status(401).json({ 
                 success: false,
                 message: "Invalid email or password" 
@@ -218,6 +219,7 @@ exports.login = async (req, res) => {
         // Verify password
         const isPasswordValid = await user.comparePassword(password);
         if (!isPasswordValid) {
+            console.log('[AUTH] Login failed: Invalid password');
             return res.status(401).json({ 
                 success: false,
                 message: "Invalid email or password" 
@@ -230,8 +232,8 @@ exports.login = async (req, res) => {
         // Set cookie
         setTokenCookie(res, token);
         
-        console.log('✅ Login successful for:', user.email);
-        console.log('👤 Welcome back,', user.nickName);
+        console.log('[AUTH] Login successful for: ' + user.email);
+        console.log('[AUTH] Welcome back, ' + user.nickName);
 
         res.status(200).json({
             success: true,

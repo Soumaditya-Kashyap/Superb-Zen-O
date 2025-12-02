@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import TopNavbar from '../components/TopNavbar';
@@ -10,11 +10,16 @@ import {
   Share2,
   Star,
   Clock,
-  Film
+  Film,
+  PlayCircle,
+  AlertTriangle
 } from 'lucide-react';
 import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import HLSVideoPlayer from '../components/HLSVideoPlayer';
+
+// CloudFront base URL from environment variable
+const CLOUDFRONT_BASE_URL = import.meta.env.VITE_CLOUDFRONT_BASE_URL || 'https://d2k6afcpy0ja0m.cloudfront.net';
 
 const MoviePlayer = () => {
   const { imdbId } = useParams();
@@ -27,6 +32,19 @@ const MoviePlayer = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSaved, setIsSaved] = useState(false);
   const [currentFilter, setCurrentFilter] = useState('All Media');
+
+  // Check if movie has HLS streaming available and construct URL
+  const streamUrl = useMemo(() => {
+    if (movie?.videoFolderName) {
+      const url = `${CLOUDFRONT_BASE_URL}/${movie.videoFolderName}/master.m3u8`;
+      console.log('🎬 Stream URL constructed:', url);
+      return url;
+    }
+    console.log('⚠️ No videoFolderName available for this movie');
+    return null;
+  }, [movie?.videoFolderName]);
+
+  const isVideoAvailable = !!streamUrl;
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -254,11 +272,60 @@ const MoviePlayer = () => {
                border-2 border-gold/30 bg-black"
     style={{ height: "calc(100vh - 140px)" }}
   >
-    <HLSVideoPlayer
-      movieId={imdbId}
-      movieTitle={movie.Title}
-      posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
-    />
+    {isVideoAvailable ? (
+      <HLSVideoPlayer
+        streamUrl={streamUrl}
+        movieTitle={movie.Title}
+        posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
+      />
+    ) : (
+      /* Coming Soon Overlay */
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-black/80 via-black/90 to-black">
+        {/* Background Poster with blur */}
+        {movie.Poster && movie.Poster !== 'N/A' && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center opacity-20 blur-xl"
+            style={{ backgroundImage: `url(${movie.Poster})` }}
+          />
+        )}
+        
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="relative z-10 text-center px-6"
+        >
+          <motion.div
+            animate={{ 
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              repeatType: "reverse" 
+            }}
+            className="mb-6"
+          >
+            <PlayCircle size={80} className="text-gold/50 mx-auto" />
+          </motion.div>
+          
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Coming Soon
+          </h2>
+          
+          <p className="text-white/60 text-lg mb-6 max-w-md mx-auto">
+            This movie is not yet available for streaming. 
+            Check back later for updates!
+          </p>
+          
+          <div className="flex items-center justify-center gap-2 text-gold/80 bg-gold/10 px-4 py-2 rounded-full">
+            <AlertTriangle size={18} />
+            <span className="text-sm font-medium">Streaming Unavailable</span>
+          </div>
+        </motion.div>
+      </div>
+    )}
   </motion.div>
 </div>
 

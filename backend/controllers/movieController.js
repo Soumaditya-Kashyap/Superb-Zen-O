@@ -4,14 +4,14 @@ const MovieScraper = require('../utils/movieScraper.js');
 // Get hero section movies
 exports.getHeroMovies = async (req, res) => {
   try {
-    console.log('🎬 Fetching hero section movies...');
+    console.log('[HERO] Fetching hero section movies...');
     
     const heroMovies = await Movie.find({ isHero: true })
       .sort({ heroOrder: 1 })
       .limit(10);
     
     if (heroMovies.length === 0) {
-      console.log('⚠️  No hero movies found in database');
+      console.log('[HERO] No hero movies found in database');
       return res.json({
         success: true,
         heroMovies: [],
@@ -33,10 +33,11 @@ exports.getHeroMovies = async (req, res) => {
       rating: movie.imdbRating,
       year: movie.Year,
       genre: movie.Genre,
-      runtime: movie.Runtime
+      runtime: movie.Runtime,
+      videoFolderName: movie.videoFolderName || null
     }));
     
-    console.log(`✅ Found ${formattedHeroMovies.length} hero movies`);
+    console.log('[HERO] Found ' + formattedHeroMovies.length + ' hero movies');
     
     res.json({
       success: true,
@@ -45,7 +46,7 @@ exports.getHeroMovies = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Hero movies error:', error);
+    console.error('[HERO] Error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch hero movies'
@@ -62,7 +63,7 @@ exports.searchMovies = async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    console.log(`🔍 Searching database for: "${query}"`);
+    console.log('[SEARCH] Query: "' + query + '"');
 
     const movies = await Movie.find({
       $or: [
@@ -84,7 +85,7 @@ exports.searchMovies = async (req, res) => {
       ]
     });
 
-    console.log(`✅ Found ${movies.length} movies matching "${query}"`);
+    console.log('[SEARCH] Found ' + movies.length + ' movies matching "' + query + '"');
 
     res.json({
       success: true,
@@ -93,22 +94,22 @@ exports.searchMovies = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Search error:', error);
+    console.error('[SEARCH] Error:', error.message);
     res.status(500).json({ error: 'Failed to search movies' });
   }
 };
 
 // Get personalized movies based on user preferences
 exports.getPersonalizedMovies = async (req, res) => {
-  console.log('🚀 PERSONALIZED ROUTE HIT - Request received');
+  console.log('[PERSONALIZED] Request received');
   try {
-    console.log('🎬 Fetching personalized movies for user:', req.user?.nickName || 'Unknown');
+    console.log('[PERSONALIZED] Fetching for user: ' + (req.user?.nickName || 'Unknown'));
     
     const User = require('../models/user.js');
     const user = await User.findById(req.user.id);
     
     if (!user || !user.preferences || !user.preferences.genres || user.preferences.genres.length === 0) {
-      console.log('⚠️  No preferences found, returning empty');
+      console.log('[PERSONALIZED] No preferences found, returning empty');
       return res.json({
         success: true,
         message: 'No preferences set',
@@ -118,10 +119,7 @@ exports.getPersonalizedMovies = async (req, res) => {
       });
     }
 
-    console.log('✅ User preferences:', {
-      languages: user.preferences.languages,
-      genres: user.preferences.genres,
-    });
+    console.log('[PERSONALIZED] User preferences - Languages: ' + user.preferences.languages.join(', ') + ', Genres: ' + user.preferences.genres.join(', '));
 
     const personalizedMovies = [];
     const userLanguages = user.preferences.languages || [];
@@ -129,7 +127,7 @@ exports.getPersonalizedMovies = async (req, res) => {
     
     // Create combinations of genres and languages for personalized sections
     for (const genre of userGenres) {
-      console.log(`📽️  Fetching ${genre} movies from database...`);
+      console.log('[PERSONALIZED] Fetching ' + genre + ' movies...');
       
       // Build query to match genre AND user's selected languages
       const query = {
@@ -151,7 +149,7 @@ exports.getPersonalizedMovies = async (req, res) => {
         .limit(30);
       
       if (movies.length > 0) {
-        console.log(`✅ Found ${movies.length} ${genre} movies (filtered by languages: ${userLanguages.join(', ')})`);
+        console.log('[PERSONALIZED] Found ' + movies.length + ' ' + genre + ' movies');
         
         personalizedMovies.push({
           genre,
@@ -160,13 +158,13 @@ exports.getPersonalizedMovies = async (req, res) => {
           totalResults: movies.length,
         });
       } else {
-        console.log(`⚠️  No ${genre} movies found with languages: ${userLanguages.join(', ')}`);
+        console.log('[PERSONALIZED] No ' + genre + ' movies found');
       }
     }
 
     // Also create language-specific sections
     for (const language of userLanguages) {
-      console.log(`🌐 Fetching ${language} movies from database...`);
+      console.log('[PERSONALIZED] Fetching ' + language + ' movies...');
       
       const movies = await Movie.find({
         languages: language.toLowerCase(),
@@ -176,21 +174,21 @@ exports.getPersonalizedMovies = async (req, res) => {
       .limit(30);
       
       if (movies.length > 0) {
-        console.log(`✅ Found ${movies.length} ${language} movies`);
+        console.log('[PERSONALIZED] Found ' + movies.length + ' ' + language + ' movies');
         
         personalizedMovies.push({
           genre: language,
-          displayName: `${language.charAt(0).toUpperCase() + language.slice(1)} Movies`,
+          displayName: language.charAt(0).toUpperCase() + language.slice(1) + ' Movies',
           movies: movies,
           totalResults: movies.length,
           isLanguageCategory: true,
         });
       } else {
-        console.log(`⚠️  No ${language} movies in database yet`);
+        console.log('[PERSONALIZED] No ' + language + ' movies in database');
       }
     }
 
-    console.log(`🎉 Returning ${personalizedMovies.length} personalized categories for ${user.nickName}`);
+    console.log('[PERSONALIZED] Returning ' + personalizedMovies.length + ' categories for ' + user.nickName);
 
     res.json({
       success: true,
@@ -204,7 +202,7 @@ exports.getPersonalizedMovies = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Personalized movies error:', error);
+    console.error('[PERSONALIZED] Error:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch personalized movies' 
@@ -221,32 +219,35 @@ exports.getMovieById = async (req, res) => {
       return res.status(400).json({ error: 'Movie ID is required' });
     }
 
-    console.log(`📽️  Fetching movie details for: ${id}`);
+    console.log('[MOVIE DETAILS] Fetching: ' + id);
 
     const movie = await Movie.findOne({ imdbID: id });
 
     if (movie) {
-      console.log(`✅ Found movie: ${movie.Title}`);
+      console.log('[MOVIE DETAILS] Found: ' + movie.Title);
+      console.log('[MOVIE DETAILS] Video available: ' + (movie.videoFolderName ? 'Yes (' + movie.videoFolderName + ')' : 'No'));
       res.json({
         success: true,
         movie,
       });
     } else {
-      console.log(`⚠️  Movie not found in database, fetching from OMDb...`);
+      console.log('[MOVIE DETAILS] Not in database, fetching from OMDb API...');
       
       // Fallback to OMDb API if not in database
       const fetch = require('node-fetch');
       const OMDB_API_KEY = process.env.OMDB_API_KEY;
-      const url = `http://www.omdbapi.com/?i=${id}&apikey=${OMDB_API_KEY}&plot=full`;
+      const url = 'http://www.omdbapi.com/?i=' + id + '&apikey=' + OMDB_API_KEY + '&plot=full';
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.Response === 'True') {
+        console.log('[MOVIE DETAILS] Found from OMDb: ' + data.Title);
         res.json({
           success: true,
           movie: data,
         });
       } else {
+        console.log('[MOVIE DETAILS] Movie not found anywhere');
         res.status(404).json({
           success: false,
           error: 'Movie not found',
@@ -255,7 +256,7 @@ exports.getMovieById = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ Movie details error:', error);
+    console.error('[MOVIE DETAILS] Error:', error.message);
     res.status(500).json({ error: 'Failed to fetch movie details' });
   }
 };
@@ -266,7 +267,7 @@ exports.getMoviesByCategory = async (req, res) => {
     const { category } = req.params;
     const { page = 1, limit = 20 } = req.query;
     
-    console.log(`📽️  Fetching ${category} movies from database...`);
+    console.log('[CATEGORY] Fetching ' + category + ' movies...');
     
     // Handle special "trending" category
     let query = {};
@@ -283,7 +284,7 @@ exports.getMoviesByCategory = async (req, res) => {
     
     const total = await Movie.countDocuments(query);
     
-    console.log(`✅ Found ${movies.length} ${category} movies`);
+    console.log('[CATEGORY] Found ' + movies.length + ' ' + category + ' movies');
     
     res.json({
       success: true,
@@ -294,7 +295,7 @@ exports.getMoviesByCategory = async (req, res) => {
     });
     
   } catch (error) {
-    console.error(`❌ Error fetching ${req.params.category}:`, error);
+    console.error('[CATEGORY] Error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch category movies'
@@ -308,7 +309,7 @@ exports.toggleFavorite = async (req, res) => {
     const { imdbId } = req.body;
     const userId = req.user.id;
 
-    console.log(`💖 Toggling favorite for user ${userId}, movie ${imdbId}`);
+    console.log('[FAVORITE] Toggle for user ' + userId + ', movie ' + imdbId);
 
     const User = require('../models/user.js');
     const user = await User.findById(userId);
@@ -332,7 +333,7 @@ exports.toggleFavorite = async (req, res) => {
       // Remove from favorites
       user.favorites.splice(favoriteIndex, 1);
       await user.save();
-      console.log(`✅ Removed ${imdbId} from favorites`);
+      console.log('[FAVORITE] Removed ' + imdbId + ' from favorites');
       
       return res.json({
         success: true,
@@ -344,7 +345,7 @@ exports.toggleFavorite = async (req, res) => {
       // Add to favorites
       user.favorites.push(imdbId);
       await user.save();
-      console.log(`✅ Added ${imdbId} to favorites`);
+      console.log('[FAVORITE] Added ' + imdbId + ' to favorites');
       
       return res.json({
         success: true,
@@ -355,7 +356,7 @@ exports.toggleFavorite = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ Toggle favorite error:', error);
+    console.error('[FAVORITE] Error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to toggle favorite'
@@ -368,7 +369,7 @@ exports.getFavorites = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    console.log(`💖 Fetching favorites for user ${userId}`);
+    console.log('[FAVORITES] Fetching for user ' + userId);
 
     const User = require('../models/user.js');
     const user = await User.findById(userId);
@@ -381,6 +382,7 @@ exports.getFavorites = async (req, res) => {
     }
 
     if (!user.favorites || user.favorites.length === 0) {
+      console.log('[FAVORITES] No favorites found');
       return res.json({
         success: true,
         favorites: [],
@@ -391,7 +393,7 @@ exports.getFavorites = async (req, res) => {
     // Fetch movie details for all favorites
     const movies = await Movie.find({ imdbID: { $in: user.favorites } });
 
-    console.log(`✅ Found ${movies.length} favorite movies`);
+    console.log('[FAVORITES] Found ' + movies.length + ' favorite movies');
 
     res.json({
       success: true,
@@ -400,7 +402,7 @@ exports.getFavorites = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get favorites error:', error);
+    console.error('[FAVORITES] Error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch favorites'

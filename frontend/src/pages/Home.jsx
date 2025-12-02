@@ -334,6 +334,7 @@ const Home = () => {
          <TopNavbar 
            showBackButton={false} 
            onFilterChange={handleFilterChange}
+           onMovieSelect={(imdbId) => setSelectedMovie(imdbId)}
            currentFilter={filterType}
          />
 
