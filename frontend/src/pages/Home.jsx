@@ -34,6 +34,7 @@ const Home = () => {
   const [selectedHeroMovie, setSelectedHeroMovie] = useState(null);
   const [heroSlides, setHeroSlides] = useState([]);
   const [heroLoading, setHeroLoading] = useState(true);
+  const [slideResetKey, setSlideResetKey] = useState(0);
 
   // Fetch hero movies from database
   useEffect(() => {
@@ -87,16 +88,26 @@ const Home = () => {
     fetchHeroMovies();
   }, []);
 
-  // Auto-play carousel
+  // Auto-play carousel - 3 seconds per slide, resets on manual navigation
   useEffect(() => {
     if (heroSlides.length === 0) return;
     
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 5000); // Change slide every 5 seconds
+    }, 3000); // Change slide every 3 seconds
 
     return () => clearInterval(interval);
-  }, [heroSlides.length]);
+  }, [heroSlides.length, slideResetKey]);
+
+  // Function to handle manual slide change (resets timer)
+  const handleSlideChange = (newSlide) => {
+    if (typeof newSlide === 'function') {
+      setCurrentSlide(newSlide);
+    } else {
+      setCurrentSlide(newSlide);
+    }
+    setSlideResetKey((prev) => prev + 1); // Reset the timer
+  };
 
   useEffect(() => {
     const fetchPersonalizedMovies = async () => {
@@ -474,7 +485,7 @@ const Home = () => {
               {heroSlides.map((_, index) => (
                 <motion.button
                   key={index}
-                  onClick={() => setCurrentSlide(index)}
+                  onClick={() => handleSlideChange(index)}
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
                   className={`transition-all duration-500 rounded-full ${
@@ -486,23 +497,19 @@ const Home = () => {
               ))}
             </div>
 
-            {/* Navigation Arrows */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
-              className="absolute -left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            {/* Navigation Arrows - Hidden by default, visible on hover */}
+            <button
+              onClick={() => handleSlideChange((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
+              className="absolute -left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-300 opacity-0 group-hover:opacity-100 z-20"
             >
               <ChevronDown size={24} className="rotate-90" />
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setCurrentSlide((prev) => (prev + 1) % heroSlides.length)}
-              className="absolute -right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100 z-20"
+            </button>
+            <button
+              onClick={() => handleSlideChange((prev) => (prev + 1) % heroSlides.length)}
+              className="absolute -right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 hover:scale-110 active:scale-95 transition-all duration-300 opacity-0 group-hover:opacity-100 z-20"
             >
               <ChevronDown size={24} className="-rotate-90" />
-            </motion.button>
+            </button>
 
             {/* Slide Counter */}
             <div className="absolute top-4 right-4 px-3 py-1.5 bg-black/50 backdrop-blur-md border border-white/20 rounded-lg text-white text-sm font-bold z-20">

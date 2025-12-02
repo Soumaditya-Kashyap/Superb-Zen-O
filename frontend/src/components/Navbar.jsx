@@ -3,7 +3,7 @@ import {
   Home,
   Users,
   MessageCircle,
-  Radio,
+  Heart,
   LayoutGrid,
   Zap,
   Music,
@@ -18,7 +18,7 @@ const Navbar = () => {
     { path: '/', icon: <Home />, label: 'Home' },
     { path: '/watch-together', icon: <Users />, label: 'Watch Together' },
     { path: '/chat', icon: <MessageCircle />, label: 'Chat' },
-    { path: '/live', icon: <Radio />, label: 'Live' },
+    { path: '/wish', icon: <Heart />, label: 'Wish' },
     { path: '/categories', icon: <LayoutGrid />, label: 'Categories' },
     { path: '/sparks', icon: <Zap />, label: 'Sparks' },
     { path: '/music', icon: <Music />, label: 'Music' },
@@ -33,23 +33,22 @@ const Navbar = () => {
     <nav className="fixed left-0 top-0 h-screen w-20 glass-effect flex flex-col items-center py-5 z-[1000] border-r border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300 hover:w-56 hover:bg-black/60 group">
 
       {/* Logo Section */}
-      <div className="mb-10 w-full px-5">
-        <div className="flex items-center gap-3 w-full py-[18px] px-3
-             transition-all duration-300">
+      <div className="mb-10 w-full px-3 overflow-hidden">
+        <div className="flex items-center w-full py-[18px] px-2">
 
-          {/* Logo Icon */}
-          <div className="min-w-[40px] flex items-center justify-center -ml-2">
+          {/* Logo Icon - Centered when collapsed */}
+          <div className="min-w-[48px] w-[48px] flex-shrink-0 flex items-center justify-center">
             <img
               src="https://ik.imagekit.io/tjwfni5wku/icon-for-dark.png"
               alt="Logo"
-              className="w-8 h-8 object-contain transition-all duration-300 group-hover:scale-110"
+              className="w-10 h-10 object-contain"
             />
           </div>
-          {/* Logo Text / Image */}
+          {/* Logo Text / Image - Visible on hover */}
           <img
             src="https://ik.imagekit.io/ugweqp16c/images/appLogo/superb-light.png?updatedAt=1764608226250"
             alt="Superb"
-            className="w-32 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            className="h-8 w-auto ml-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
           />
         </div>
       </div>

@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import WatchTogether from './pages/WatchTogether';
 import Chat from './pages/Chat';
-import Live from './pages/Live';
+import Wish from './pages/Wish';
 import Sparks from './pages/Sparks';
 import Categories from './pages/Categories';
 import MusicPage from './pages/MusicPage';
@@ -113,8 +113,8 @@ function AppContent() {
           <Route path="/chat" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Chat /></ProtectedRoute>
           } />
-          <Route path="/live" element={
-            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Live /></ProtectedRoute>
+          <Route path="/wish" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Wish /></ProtectedRoute>
           } />
           <Route path="/categories" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Categories /></ProtectedRoute>
