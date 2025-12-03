@@ -40,6 +40,7 @@ const Chat = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState({});
+  const [socketConnected, setSocketConnected] = useState(false);
   
   // Refs
   const socketRef = useRef(null);
@@ -54,42 +55,78 @@ const Chat = () => {
   useEffect(() => {
     if (!token) return;
 
-    socketRef.current = io('http://localhost:5000', {
-      auth: { token }
+    const socket = io('http://localhost:5000', {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('[CHAT] Socket connected');
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[CHAT] Socket connected, ID:', socket.id);
+      setSocketConnected(true);
+      // Request online status of friends when connected
+      if (friends.length > 0) {
+        const friendIds = friends.map(f => f._id);
+        socket.emit('users:status', { userIds: friendIds });
+      }
     });
 
-    socketRef.current.on('message:received', (data) => {
+    socket.on('disconnect', () => {
+      console.log('[CHAT] Socket disconnected');
+      setSocketConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[CHAT] Socket connection error:', error.message);
+      setSocketConnected(false);
+    });
+
+    socket.on('message:received', (data) => {
+      console.log('[CHAT] Message received:', data);
       // Add new message at the end (newest at bottom)
       setMessages(prev => [...prev, data.message]);
       setTimeout(() => scrollToBottom(), 100);
     });
 
-    socketRef.current.on('typing:start', (data) => {
-      setTypingUsers(prev => [...prev.filter(u => u.oderId !== data.userId), data]);
+    // Also listen for message notifications (for when not in room)
+    socket.on('message:notification', (data) => {
+      console.log('[CHAT] Message notification:', data);
+      // Optionally show a toast notification here
     });
 
-    socketRef.current.on('typing:stop', (data) => {
+    socket.on('typing:start', (data) => {
+      setTypingUsers(prev => [...prev.filter(u => u.userId !== data.userId), data]);
+    });
+
+    socket.on('typing:stop', (data) => {
       setTypingUsers(prev => prev.filter(u => u.userId !== data.userId));
     });
 
-    socketRef.current.on('user:online', (data) => {
+    socket.on('user:online', (data) => {
+      console.log('[CHAT] User online:', data.userId);
       setOnlineUsers(prev => ({ ...prev, [data.userId]: true }));
     });
 
-    socketRef.current.on('user:offline', (data) => {
+    socket.on('user:offline', (data) => {
+      console.log('[CHAT] User offline:', data.userId);
       setOnlineUsers(prev => ({ ...prev, [data.userId]: false }));
     });
 
-    socketRef.current.on('message:notification', (data) => {
-      // Could show a toast notification here
-      console.log('[CHAT] New message notification:', data);
+    // Listen for online status responses
+    socket.on('users:status', (statuses) => {
+      console.log('[CHAT] Users status received:', statuses);
+      setOnlineUsers(prev => ({ ...prev, ...statuses }));
     });
 
-    socketRef.current.on('error', (data) => {
+    socket.on('room:joined', (data) => {
+      console.log('[CHAT] Joined room:', data.chatRoomId);
+    });
+
+    socket.on('error', (data) => {
       console.error('[CHAT] Socket error:', data.message);
     });
 
@@ -105,6 +142,27 @@ const Chat = () => {
     fetchPendingHandshakes();
     fetchFriends();
   }, []);
+
+  // Request online status when socket connects and friends are loaded
+  useEffect(() => {
+    if (socketConnected && friends.length > 0) {
+      const friendIds = friends.map(f => f._id);
+      console.log('[CHAT] Requesting online status for friends:', friendIds);
+      socketRef.current?.emit('users:status', { userIds: friendIds });
+    }
+  }, [socketConnected, friends]);
+
+  // Periodic status check (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (socketConnected && friends.length > 0) {
+        const friendIds = friends.map(f => f._id);
+        socketRef.current?.emit('users:status', { userIds: friendIds });
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [socketConnected, friends]);
 
   // Search users with debounce
   useEffect(() => {
@@ -274,9 +332,22 @@ const Chat = () => {
       if (roomData.success) {
         setActiveChatRoom(roomData.chatRoom);
         
-        // Join the socket room
-        if (socketRef.current) {
+        // Join the socket room - ensure socket is connected
+        if (socketRef.current?.connected) {
+          console.log('[CHAT] Joining room:', roomData.chatRoom._id);
           socketRef.current.emit('room:join', { chatRoomId: roomData.chatRoom._id });
+        } else {
+          console.warn('[CHAT] Socket not connected, waiting...');
+          // Wait for socket to connect and then join
+          const checkSocket = setInterval(() => {
+            if (socketRef.current?.connected) {
+              console.log('[CHAT] Socket connected, joining room:', roomData.chatRoom._id);
+              socketRef.current.emit('room:join', { chatRoomId: roomData.chatRoom._id });
+              clearInterval(checkSocket);
+            }
+          }, 500);
+          // Clear interval after 5 seconds to prevent infinite loop
+          setTimeout(() => clearInterval(checkSocket), 5000);
         }
         
         // Fetch messages
@@ -293,7 +364,7 @@ const Chat = () => {
           setTimeout(() => scrollToBottom(), 100);
           
           // Mark messages as read
-          if (socketRef.current) {
+          if (socketRef.current?.connected) {
             socketRef.current.emit('messages:read', { chatRoomId: roomData.chatRoom._id });
           }
         }
