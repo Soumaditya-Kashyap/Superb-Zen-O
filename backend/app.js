@@ -24,9 +24,13 @@ const io = initializeSocket(server);
 // Make io accessible in routes/controllers
 app.set('io', io);
 
-// Middleware
+// Middleware - Allow all origins in development for testing with teammates
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['https://your-production-domain.com']
+  : true; // Allow all origins in development
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
@@ -52,12 +56,15 @@ app.use('/api/chat', require('./routes/chat'));
 app.use(errorHandler);
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('\n' + '='.repeat(60));
   console.log('[SERVER] Running on http://localhost:' + PORT);
+  console.log('[SERVER] Also accessible on your network IP (for teammates)');
   console.log('[API] Endpoints available at http://localhost:' + PORT + '/api');
   console.log('[SOCKET] WebSocket server ready for connections');
   console.log('='.repeat(60) + '\n');
+  console.log('[TIP] To find your IP, run: ipconfig (Windows) or ifconfig (Mac/Linux)');
+  console.log('[TIP] Teammates should set VITE_SOCKET_URL=http://YOUR_IP:5000');
   console.log('[INFO] All API requests will be logged below');
   console.log('[INFO] Waiting for connections...\n');
 });

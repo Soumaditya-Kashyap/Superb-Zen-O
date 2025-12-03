@@ -13,10 +13,14 @@ const onlineUsers = new Map();
 function initializeSocket(httpServer) {
     const io = new Server(httpServer, {
         cors: {
-            origin: ['http://localhost:5173', 'http://localhost:5174'],
+            origin: true, // Allow all origins in development
             methods: ['GET', 'POST'],
             credentials: true
-        }
+        },
+        // Allow connections from different IPs in development
+        allowEIO3: true,
+        pingTimeout: 60000,
+        pingInterval: 25000
     });
 
     // Authentication middleware for Socket.io

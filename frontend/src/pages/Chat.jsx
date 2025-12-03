@@ -16,7 +16,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Use environment variable or fallback to localhost
+// For testing with teammate, change this to the host machine's IP address
+// e.g., 'http://192.168.1.100:5000' 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const Chat = () => {
   // View state: 'connect' or 'chat'
@@ -55,47 +59,50 @@ const Chat = () => {
   useEffect(() => {
     if (!token) return;
 
-    const socket = io('http://localhost:5000', {
+    console.log('[CHAT] Connecting to socket server:', SOCKET_URL);
+    
+    const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 20000
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[CHAT] Socket connected, ID:', socket.id);
+      console.log('[CHAT] ✅ Socket connected! ID:', socket.id);
       setSocketConnected(true);
-      // Request online status of friends when connected
-      if (friends.length > 0) {
-        const friendIds = friends.map(f => f._id);
-        socket.emit('users:status', { userIds: friendIds });
-      }
     });
 
-    socket.on('disconnect', () => {
-      console.log('[CHAT] Socket disconnected');
+    socket.on('disconnect', (reason) => {
+      console.log('[CHAT] ❌ Socket disconnected. Reason:', reason);
       setSocketConnected(false);
     });
 
     socket.on('connect_error', (error) => {
-      console.error('[CHAT] Socket connection error:', error.message);
+      console.error('[CHAT] ⚠️ Socket connection error:', error.message);
       setSocketConnected(false);
     });
 
     socket.on('message:received', (data) => {
-      console.log('[CHAT] Message received:', data);
+      console.log('[CHAT] 📩 Message received:', data.message?.content);
       // Add new message at the end (newest at bottom)
-      setMessages(prev => [...prev, data.message]);
+      setMessages(prev => {
+        // Avoid duplicate messages
+        const exists = prev.some(m => m._id === data.message._id);
+        if (exists) return prev;
+        return [...prev, data.message];
+      });
       setTimeout(() => scrollToBottom(), 100);
     });
 
     // Also listen for message notifications (for when not in room)
     socket.on('message:notification', (data) => {
-      console.log('[CHAT] Message notification:', data);
-      // Optionally show a toast notification here
+      console.log('[CHAT] 🔔 Message notification:', data);
+      // Could show a toast notification here
     });
 
     socket.on('typing:start', (data) => {
@@ -107,30 +114,31 @@ const Chat = () => {
     });
 
     socket.on('user:online', (data) => {
-      console.log('[CHAT] User online:', data.userId);
+      console.log('[CHAT] 🟢 User online:', data.userId);
       setOnlineUsers(prev => ({ ...prev, [data.userId]: true }));
     });
 
     socket.on('user:offline', (data) => {
-      console.log('[CHAT] User offline:', data.userId);
+      console.log('[CHAT] 🔴 User offline:', data.userId);
       setOnlineUsers(prev => ({ ...prev, [data.userId]: false }));
     });
 
     // Listen for online status responses
     socket.on('users:status', (statuses) => {
-      console.log('[CHAT] Users status received:', statuses);
+      console.log('[CHAT] 👥 Users status received:', statuses);
       setOnlineUsers(prev => ({ ...prev, ...statuses }));
     });
 
     socket.on('room:joined', (data) => {
-      console.log('[CHAT] Joined room:', data.chatRoomId);
+      console.log('[CHAT] 🚪 Joined room:', data.chatRoomId);
     });
 
     socket.on('error', (data) => {
-      console.error('[CHAT] Socket error:', data.message);
+      console.error('[CHAT] ❌ Socket error:', data.message);
     });
 
     return () => {
+      console.log('[CHAT] Cleaning up socket connection');
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
