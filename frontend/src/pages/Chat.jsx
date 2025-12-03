@@ -63,8 +63,9 @@ const Chat = () => {
     });
 
     socketRef.current.on('message:received', (data) => {
+      // Add new message at the end (newest at bottom)
       setMessages(prev => [...prev, data.message]);
-      scrollToBottom();
+      setTimeout(() => scrollToBottom(), 100);
     });
 
     socketRef.current.on('typing:start', (data) => {
@@ -286,8 +287,10 @@ const Chat = () => {
         const messagesData = await messagesResponse.json();
         
         if (messagesData.success) {
-          setMessages(messagesData.messages.reverse() || []);
-          scrollToBottom();
+          // Messages already come in chronological order (oldest first) from backend
+          // Don't reverse - we want oldest at top, newest at bottom (like WhatsApp)
+          setMessages(messagesData.messages || []);
+          setTimeout(() => scrollToBottom(), 100);
           
           // Mark messages as read
           if (socketRef.current) {
@@ -660,23 +663,28 @@ const Chat = () => {
               ) : messages.length > 0 ? (
                 <>
                   {messages.map((message, index) => {
-                    const isOwn = message.sender?._id === currentUser._id || message.sender === currentUser._id;
+                    // Check if message was sent by current user
+                    // Handle both populated sender object and plain string ID
+                    const senderId = message.sender?._id || message.sender;
+                    const isOwn = senderId === currentUser._id || senderId === currentUser.id;
+                    
                     return (
                       <motion.div
                         key={message._id || index}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        transition={{ delay: index * 0.02 }}
+                        className={`flex w-full ${isOwn ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
+                        <div className={`max-w-[70%] ${isOwn ? 'ml-auto' : 'mr-auto'}`}>
                           <div className={`px-4 py-2.5 rounded-2xl ${
                             isOwn 
-                              ? 'bg-gold text-black rounded-br-md' 
-                              : 'bg-white/10 text-white rounded-bl-md'
+                              ? 'bg-gradient-to-r from-gold to-gold-light text-black rounded-br-sm' 
+                              : 'bg-white/10 text-white rounded-bl-sm'
                           }`}>
-                            <p className="break-words">{message.content}</p>
+                            <p className="break-words whitespace-pre-wrap">{message.content}</p>
                           </div>
-                          <p className={`text-xs text-white/40 mt-1 ${isOwn ? 'text-right' : 'text-left'}`}>
+                          <p className={`text-xs text-white/40 mt-1 px-1 ${isOwn ? 'text-right' : 'text-left'}`}>
                             {formatTime(message.createdAt)}
                           </p>
                         </div>
