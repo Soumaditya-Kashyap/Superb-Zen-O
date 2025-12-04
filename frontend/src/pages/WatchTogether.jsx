@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -15,9 +15,11 @@ import {
   LogOut,
   AlertTriangle
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 import CreateRoomModal from '../components/CreateRoomModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 const WatchTogether = () => {
   const navigate = useNavigate();
@@ -39,8 +41,59 @@ const WatchTogether = () => {
   // Past sessions view toggle: 'created' or 'joined'
   const [pastSessionsView, setPastSessionsView] = useState('created');
   
+  // Socket ref
+  const socketRef = useRef(null);
+  
   // Get current user from localStorage
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const token = localStorage.getItem('token');
+
+  // Initialize Socket.io connection for real-time room updates
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[WATCH] ✅ Socket connected for room updates');
+    });
+
+    // Listen for room closed event
+    socket.on('room:closed', (data) => {
+      console.log('[WATCH] 🚪 Room closed by host:', data.roomId);
+      
+      // Move room from activeRooms to pastRooms with ended status
+      setActiveRooms(prev => {
+        const closedRoom = prev.find(r => r._id === data.roomId);
+        if (closedRoom) {
+          // Add to pastRooms with ended status
+          setPastRooms(pastPrev => [{
+            ...closedRoom,
+            status: 'ended',
+            userStatus: 'ended',
+            endTime: new Date()
+          }, ...pastPrev]);
+        }
+        // Remove from activeRooms
+        return prev.filter(r => r._id !== data.roomId);
+      });
+      
+      // Show notification
+      alert('The host has closed this room');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token]);
 
   // Fetch room history on mount
   useEffect(() => {

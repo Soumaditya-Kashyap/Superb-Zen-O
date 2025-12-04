@@ -497,6 +497,28 @@ exports.endRoom = async (req, res) => {
 
         await room.save();
 
+        // Emit socket event to notify all participants that room is closed
+        const io = req.app.get('io');
+        if (io) {
+            // Notify all participants (except host) that room is closed
+            room.participants.forEach(participantId => {
+                if (participantId.toString() !== userId) {
+                    io.to(`user:${participantId}`).emit('room:closed', {
+                        roomId: room._id,
+                        message: 'The host has closed this room'
+                    });
+                }
+            });
+            
+            // Also emit to the room itself for anyone currently watching
+            io.to(`watch:${roomId}`).emit('room:closed', {
+                roomId: room._id,
+                message: 'The host has closed this room'
+            });
+            
+            console.log('[ROOM] ✅ Room closed event emitted to participants');
+        }
+
         console.log('[ROOM] Room ended:', roomId);
 
         res.json({
