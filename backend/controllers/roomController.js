@@ -123,23 +123,46 @@ exports.createRoom = async (req, res) => {
                         chatRoom.lastMessageAt = message.createdAt;
                         await chatRoom.save();
 
-                        // Emit via socket if available
+                        // Populate sender info for socket emission
+                        await message.populate('sender', 'name nickName profilePicture');
+
+                        // Emit via socket if available - REAL-TIME delivery
                         const io = req.app.get('io');
                         if (io) {
-                            io.to(`user_${friendId}`).emit('newMessage', {
-                                _id: message._id,
+                            const messageData = {
+                                message: {
+                                    _id: message._id,
+                                    chatRoomId: message.chatRoomId,
+                                    sender: message.sender,
+                                    content: message.content,
+                                    createdAt: message.createdAt,
+                                    readBy: message.readBy
+                                }
+                            };
+
+                            // Emit to the chat room (if friend is viewing that chat)
+                            io.to(`room:${chatRoom._id}`).emit('message:received', messageData);
+
+                            // Also emit to friend's personal room (notification)
+                            io.to(`user:${friendId}`).emit('message:received', messageData);
+
+                            // Send notification event too
+                            io.to(`user:${friendId}`).emit('message:notification', {
                                 chatRoomId: chatRoom._id,
-                                sender: {
-                                    _id: hostId,
-                                    name: host.name,
-                                    nickName: host.nickName
-                                },
-                                content: inviteMessage,
-                                createdAt: message.createdAt
+                                message: {
+                                    _id: message._id,
+                                    sender: message.sender,
+                                    content: message.content.substring(0, 100),
+                                    createdAt: message.createdAt
+                                }
                             });
+
+                            console.log('[ROOM] ✅ Real-time invite sent to friend:', friendId);
+                        } else {
+                            console.log('[ROOM] ⚠️ Socket.io not available, message saved but not pushed');
                         }
 
-                        console.log('[ROOM] Invite sent to friend:', friendId);
+                        console.log('[ROOM] Invite message saved for friend:', friendId);
                     }
                 } catch (msgErr) {
                     console.error('[ROOM] Failed to send invite to friend:', friendId, msgErr.message);

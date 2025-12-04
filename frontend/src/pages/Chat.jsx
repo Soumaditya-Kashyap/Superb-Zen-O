@@ -51,6 +51,7 @@ const Chat = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const activeChatRoomRef = useRef(null);
   
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -88,15 +89,25 @@ const Chat = () => {
     });
 
     socket.on('message:received', (data) => {
-      console.log('[CHAT] 📩 Message received:', data.message?.content);
-      // Add new message at the end (newest at bottom)
-      setMessages(prev => {
-        // Avoid duplicate messages
-        const exists = prev.some(m => m._id === data.message._id);
-        if (exists) return prev;
-        return [...prev, data.message];
-      });
-      setTimeout(() => scrollToBottom(), 100);
+      console.log('[CHAT] 📩 Message received:', data.message?.content?.substring(0, 50));
+      
+      // Check if the message is for the currently active chat room
+      const currentChatRoom = activeChatRoomRef.current;
+      if (currentChatRoom && data.message?.chatRoomId === currentChatRoom._id) {
+        // Add new message at the end (newest at bottom)
+        setMessages(prev => {
+          // Avoid duplicate messages
+          const exists = prev.some(m => m._id === data.message._id);
+          if (exists) return prev;
+          return [...prev, data.message];
+        });
+        setTimeout(() => scrollToBottom(), 100);
+      } else {
+        // Message is for a different chat room - show as notification or badge
+        console.log('[CHAT] 📬 Message received for different room:', data.message?.chatRoomId);
+        // Refresh friends list to potentially show unread indicator
+        fetchFriends();
+      }
     });
 
     // Also listen for message notifications (for when not in room)
@@ -144,6 +155,11 @@ const Chat = () => {
       }
     };
   }, [token]);
+
+  // Keep activeChatRoomRef in sync with activeChatRoom state
+  useEffect(() => {
+    activeChatRoomRef.current = activeChatRoom;
+  }, [activeChatRoom]);
 
   // Fetch pending handshakes and friends on mount
   useEffect(() => {
