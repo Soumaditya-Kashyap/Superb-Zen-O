@@ -12,7 +12,8 @@ import {
   Film,
   Calendar,
   UserPlus,
-  LogOut
+  LogOut,
+  AlertTriangle
 } from 'lucide-react';
 import CreateRoomModal from '../components/CreateRoomModal';
 
@@ -29,6 +30,11 @@ const WatchTogether = () => {
   const [joinError, setJoinError] = useState('');
   const [joiningRoom, setJoiningRoom] = useState(false);
   const [copiedRoomId, setCopiedRoomId] = useState(null);
+  
+  // Confirmation modal states
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   
   // Get current user from localStorage
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -73,10 +79,24 @@ const WatchTogether = () => {
     return hostId === currentUser._id || hostId === currentUser.id;
   };
 
-  const handleCloseRoom = async (roomId) => {
+  // Show close confirmation (for host)
+  const confirmCloseRoom = (room) => {
+    setSelectedRoom(room);
+    setShowCloseConfirm(true);
+  };
+
+  // Show leave confirmation (for participants)
+  const confirmLeaveRoom = (room) => {
+    setSelectedRoom(room);
+    setShowLeaveConfirm(true);
+  };
+
+  const handleCloseRoom = async () => {
+    if (!selectedRoom) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/rooms/${roomId}/end`, {
+      const response = await fetch(`${API_URL}/api/rooms/${selectedRoom._id}/end`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -85,9 +105,9 @@ const WatchTogether = () => {
       
       if (response.ok) {
         // Move room from active to past
-        const closedRoom = activeRooms.find(r => r._id === roomId);
+        const closedRoom = activeRooms.find(r => r._id === selectedRoom._id);
         if (closedRoom) {
-          setActiveRooms(prev => prev.filter(r => r._id !== roomId));
+          setActiveRooms(prev => prev.filter(r => r._id !== selectedRoom._id));
           setPastRooms(prev => [{ ...closedRoom, status: 'ended', endTime: new Date() }, ...prev]);
         }
       } else {
@@ -96,14 +116,19 @@ const WatchTogether = () => {
       }
     } catch (error) {
       console.error('Error closing room:', error);
+    } finally {
+      setShowCloseConfirm(false);
+      setSelectedRoom(null);
     }
   };
 
   // Leave a room (for non-host participants)
-  const handleLeaveRoom = async (roomId) => {
+  const handleLeaveRoom = async () => {
+    if (!selectedRoom) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/rooms/${roomId}/leave`, {
+      const response = await fetch(`${API_URL}/api/rooms/${selectedRoom._id}/leave`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -112,13 +137,16 @@ const WatchTogether = () => {
       
       if (response.ok) {
         // Remove room from active rooms list
-        setActiveRooms(prev => prev.filter(r => r._id !== roomId));
+        setActiveRooms(prev => prev.filter(r => r._id !== selectedRoom._id));
       } else {
         const data = await response.json();
         alert(data.message || 'Failed to leave room');
       }
     } catch (error) {
       console.error('Error leaving room:', error);
+    } finally {
+      setShowLeaveConfirm(false);
+      setSelectedRoom(null);
     }
   };
 
@@ -315,7 +343,7 @@ const WatchTogether = () => {
                         {/* Show Close button for host, Leave button for others */}
                         {isRoomHost(room) ? (
                           <button
-                            onClick={() => handleCloseRoom(room._id)}
+                            onClick={() => confirmCloseRoom(room)}
                             className="p-2.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition-colors"
                             title="Close room (Host only)"
                           >
@@ -323,7 +351,7 @@ const WatchTogether = () => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleLeaveRoom(room._id)}
+                            onClick={() => confirmLeaveRoom(room)}
                             className="p-2.5 bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 rounded-lg transition-colors"
                             title="Leave room"
                           >
@@ -476,6 +504,140 @@ const WatchTogether = () => {
                   </>
                 )}
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Close Room Confirmation Modal (Host Only) */}
+      <AnimatePresence>
+        {showCloseConfirm && selectedRoom && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowCloseConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-red-500/30"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-7 h-7 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Close Watch Party?</h2>
+                  <p className="text-gray-400 text-sm">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Film className="w-5 h-5 text-gold" />
+                  <span className="text-white font-medium">{selectedRoom.movie?.Title || 'Unknown Movie'}</span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  {selectedRoom.participants?.length || 0} participant(s) will be disconnected
+                </p>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6">
+                <p className="text-red-400 text-sm">
+                  ⚠️ <strong>Warning:</strong> Closing this room will end the watch party for everyone. 
+                  All participants will be disconnected and no one will be able to rejoin.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCloseConfirm(false);
+                    setSelectedRoom(null);
+                  }}
+                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCloseRoom}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <X className="w-5 h-5" />
+                  Close Room
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Leave Room Confirmation Modal (Participants) */}
+      <AnimatePresence>
+        {showLeaveConfirm && selectedRoom && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowLeaveConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-orange-500/30"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 rounded-full bg-orange-500/20 flex items-center justify-center">
+                  <LogOut className="w-7 h-7 text-orange-500" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Leave Watch Party?</h2>
+                  <p className="text-gray-400 text-sm">You can rejoin while the room is active</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Film className="w-5 h-5 text-gold" />
+                  <span className="text-white font-medium">{selectedRoom.movie?.Title || 'Unknown Movie'}</span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Hosted by {selectedRoom.host?.name || selectedRoom.host?.nickName || 'Unknown'}
+                </p>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6">
+                <p className="text-green-400 text-sm">
+                  ✅ <strong>Good news:</strong> You can rejoin this watch party anytime while 
+                  the host keeps the room active. Just use the same invite link or find it in your active rooms.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowLeaveConfirm(false);
+                    setSelectedRoom(null);
+                  }}
+                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={handleLeaveRoom}
+                  className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Leave Room
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
