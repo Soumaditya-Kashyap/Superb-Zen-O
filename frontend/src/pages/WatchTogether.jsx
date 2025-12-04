@@ -11,7 +11,8 @@ import {
   CheckCircle,
   Film,
   Calendar,
-  UserPlus
+  UserPlus,
+  LogOut
 } from 'lucide-react';
 import CreateRoomModal from '../components/CreateRoomModal';
 
@@ -28,6 +29,9 @@ const WatchTogether = () => {
   const [joinError, setJoinError] = useState('');
   const [joiningRoom, setJoiningRoom] = useState(false);
   const [copiedRoomId, setCopiedRoomId] = useState(null);
+  
+  // Get current user from localStorage
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   // Fetch room history on mount
   useEffect(() => {
@@ -63,6 +67,12 @@ const WatchTogether = () => {
     navigate(`/room/${roomId}`);
   };
 
+  // Check if current user is the host of a room
+  const isRoomHost = (room) => {
+    const hostId = room.host?._id || room.host;
+    return hostId === currentUser._id || hostId === currentUser.id;
+  };
+
   const handleCloseRoom = async (roomId) => {
     try {
       const token = localStorage.getItem('token');
@@ -80,9 +90,35 @@ const WatchTogether = () => {
           setActiveRooms(prev => prev.filter(r => r._id !== roomId));
           setPastRooms(prev => [{ ...closedRoom, status: 'ended', endTime: new Date() }, ...prev]);
         }
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to close room');
       }
     } catch (error) {
       console.error('Error closing room:', error);
+    }
+  };
+
+  // Leave a room (for non-host participants)
+  const handleLeaveRoom = async (roomId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        // Remove room from active rooms list
+        setActiveRooms(prev => prev.filter(r => r._id !== roomId));
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to leave room');
+      }
+    } catch (error) {
+      console.error('Error leaving room:', error);
     }
   };
 
@@ -276,14 +312,32 @@ const WatchTogether = () => {
                         >
                           {copiedRoomId === room._id ? <CheckCircle className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
                         </button>
-                        <button
-                          onClick={() => handleCloseRoom(room._id)}
-                          className="p-2.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition-colors"
-                          title="Close room"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
+                        {/* Show Close button for host, Leave button for others */}
+                        {isRoomHost(room) ? (
+                          <button
+                            onClick={() => handleCloseRoom(room._id)}
+                            className="p-2.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition-colors"
+                            title="Close room (Host only)"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleLeaveRoom(room._id)}
+                            className="p-2.5 bg-orange-500/20 hover:bg-orange-500/40 text-orange-400 rounded-lg transition-colors"
+                            title="Leave room"
+                          >
+                            <LogOut className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
+                      {/* Host indicator */}
+                      {isRoomHost(room) && (
+                        <div className="mt-2 text-xs text-gold flex items-center gap-1">
+                          <span className="w-2 h-2 bg-gold rounded-full"></span>
+                          You are the host
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
