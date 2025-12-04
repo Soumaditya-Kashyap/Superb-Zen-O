@@ -36,6 +36,9 @@ const WatchTogether = () => {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
   
+  // Past sessions view toggle: 'created' or 'joined'
+  const [pastSessionsView, setPastSessionsView] = useState('created');
+  
   // Get current user from localStorage
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -136,8 +139,10 @@ const WatchTogether = () => {
       });
       
       if (response.ok) {
-        // Remove room from active rooms list
-        setActiveRooms(prev => prev.filter(r => r._id !== selectedRoom._id));
+        // Update room status in activeRooms to 'left'
+        setActiveRooms(prev => prev.map(r => 
+          r._id === selectedRoom._id ? { ...r, userStatus: 'left' } : r
+        ));
       } else {
         const data = await response.json();
         alert(data.message || 'Failed to leave room');
@@ -147,6 +152,63 @@ const WatchTogether = () => {
     } finally {
       setShowLeaveConfirm(false);
       setSelectedRoom(null);
+    }
+  };
+
+  // Accept invite - joins the room without navigating to it
+  const handleAcceptInvite = async (roomId) => {
+    try {
+      const token = localStorage.getItem('token');
+      // Find the room to get invite code
+      const room = activeRooms.find(r => r._id === roomId);
+      if (!room) return;
+
+      const response = await fetch(`${API_URL}/api/rooms/join/${room.inviteCode}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Update room status in activeRooms to 'joined'
+        setActiveRooms(prev => prev.map(r => 
+          r._id === roomId ? { ...r, userStatus: 'joined' } : r
+        ));
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to accept invite');
+      }
+    } catch (error) {
+      console.error('Error accepting invite:', error);
+    }
+  };
+
+  // Rejoin a room
+  const handleRejoinRoom = async (roomId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const room = activeRooms.find(r => r._id === roomId);
+      if (!room) return;
+
+      const response = await fetch(`${API_URL}/api/rooms/join/${room.inviteCode}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Update room status in activeRooms to 'joined'
+        setActiveRooms(prev => prev.map(r => 
+          r._id === roomId ? { ...r, userStatus: 'joined' } : r
+        ));
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to rejoin room');
+      }
+    } catch (error) {
+      console.error('Error rejoining room:', error);
     }
   };
 
@@ -218,6 +280,59 @@ const WatchTogether = () => {
     return `${hours}h ${mins}m`;
   };
 
+  // Get ALL active rooms I'm in (either as host OR as joined participant)
+  const getMyActiveRooms = () => {
+    return activeRooms.filter(room => room.isHost || room.userStatus === 'joined');
+  };
+
+  // Get active rooms I joined (not host, and userStatus is 'joined')
+  const getJoinedActiveRooms = () => {
+    return activeRooms.filter(room => !room.isHost && room.userStatus === 'joined');
+  };
+
+  // Get rooms I left but are still active (for rejoin)
+  const getLeftButActiveRooms = () => {
+    return activeRooms.filter(room => !room.isHost && room.userStatus === 'left');
+  };
+
+  // Get ALL rooms I created (both active/live and ended/closed)
+  const getMyCreatedRooms = () => {
+    const myActiveCreated = activeRooms.filter(room => room.isHost);
+    const myPastCreated = pastRooms.filter(room => room.isHost);
+    // Combine and sort by date (newest first)
+    return [...myActiveCreated, ...myPastCreated].sort((a, b) => 
+      new Date(b.createdAt || b.startTime) - new Date(a.createdAt || a.startTime)
+    );
+  };
+
+  // Get ALL rooms I was invited to or joined (both active and ended/closed) - NOT as host
+  const getMyJoinedRooms = () => {
+    // Include invited, joined, and left statuses for active rooms
+    const myActiveJoined = activeRooms.filter(room => 
+      !room.isHost && (room.userStatus === 'invited' || room.userStatus === 'joined' || room.userStatus === 'left')
+    );
+    const myPastJoined = pastRooms.filter(room => !room.isHost);
+    // Combine and sort: active rooms first (sorted by status priority), then past rooms by date
+    const sortedActive = myActiveJoined.sort((a, b) => {
+      // Priority: joined > left > invited
+      const priority = { 'joined': 0, 'left': 1, 'invited': 2 };
+      return (priority[a.userStatus] || 3) - (priority[b.userStatus] || 3);
+    });
+    const sortedPast = myPastJoined.sort((a, b) => 
+      new Date(b.createdAt || b.startTime) - new Date(a.createdAt || a.startTime)
+    );
+    return [...sortedActive, ...sortedPast];
+  };
+
+  // Filter sessions based on view
+  const getFilteredSessions = () => {
+    if (pastSessionsView === 'created') {
+      return getMyCreatedRooms();
+    } else {
+      return getMyJoinedRooms();
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 md:p-10">
       {/* Header */}
@@ -256,14 +371,14 @@ const WatchTogether = () => {
         </div>
       ) : (
         <>
-          {/* Active Rooms Section */}
+          {/* Active Rooms Section - Shows rooms I CREATED */}
           <section className="mb-10">
             <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
               Active Rooms
             </h2>
             
-            {activeRooms.length === 0 ? (
+            {getMyActiveRooms().length === 0 ? (
               <div className="bg-gray-800/50 rounded-2xl p-8 text-center">
                 <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-xl text-white mb-2">No Active Rooms</h3>
@@ -278,7 +393,7 @@ const WatchTogether = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeRooms.map((room) => (
+                {getMyActiveRooms().map((room) => (
                   <motion.div
                     key={room._id}
                     initial={{ opacity: 0, y: 20 }}
@@ -333,19 +448,21 @@ const WatchTogether = () => {
                           <Play className="w-4 h-4" />
                           Enter Room
                         </button>
-                        <button
-                          onClick={() => copyInviteLink(room.inviteCode, room._id)}
-                          className={`p-2.5 rounded-lg transition-colors ${copiedRoomId === room._id ? 'bg-green-500 text-white' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
-                          title={copiedRoomId === room._id ? 'Copied!' : 'Copy invite link'}
-                        >
-                          {copiedRoomId === room._id ? <CheckCircle className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
-                        </button>
-                        {/* Show Close button for host, Leave button for others */}
+                        {isRoomHost(room) && (
+                          <button
+                            onClick={() => copyInviteLink(room.inviteCode, room._id)}
+                            className={`p-2.5 rounded-lg transition-colors ${copiedRoomId === room._id ? 'bg-green-500 text-white' : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+                            title={copiedRoomId === room._id ? 'Copied!' : 'Copy invite link'}
+                          >
+                            {copiedRoomId === room._id ? <CheckCircle className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+                          </button>
+                        )}
+                        {/* Close button for host, Leave button for participants */}
                         {isRoomHost(room) ? (
                           <button
                             onClick={() => confirmCloseRoom(room)}
                             className="p-2.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg transition-colors"
-                            title="Close room (Host only)"
+                            title="Close room"
                           >
                             <X className="w-5 h-5" />
                           </button>
@@ -359,11 +476,16 @@ const WatchTogether = () => {
                           </button>
                         )}
                       </div>
-                      {/* Host indicator */}
-                      {isRoomHost(room) && (
+                      {/* Host/Participant indicator */}
+                      {isRoomHost(room) ? (
                         <div className="mt-2 text-xs text-gold flex items-center gap-1">
                           <span className="w-2 h-2 bg-gold rounded-full"></span>
                           You are the host
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs text-blue-400 flex items-center gap-1">
+                          <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                          Hosted by {room.host?.name || room.host?.nickName || 'Unknown'}
                         </div>
                       )}
                     </div>
@@ -373,16 +495,46 @@ const WatchTogether = () => {
             )}
           </section>
 
-          {/* Past Rooms Section */}
+          {/* Sessions Section - Shows both active and past rooms */}
           <section>
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-              <Calendar className="w-6 h-6 text-gray-400" />
-              Past Sessions
-            </h2>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Calendar className="w-6 h-6 text-gray-400" />
+                My Sessions
+              </h2>
+              
+              {/* View Toggle Tabs */}
+              <div className="flex gap-2 mt-3 md:mt-0 bg-gray-800/50 p-1 rounded-xl">
+                <button
+                  onClick={() => setPastSessionsView('created')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    pastSessionsView === 'created'
+                      ? 'bg-gold text-black'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  }`}
+                >
+                  Created by me
+                </button>
+                <button
+                  onClick={() => setPastSessionsView('joined')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    pastSessionsView === 'joined'
+                      ? 'bg-gold text-black'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                  }`}
+                >
+                  Joined by me
+                </button>
+              </div>
+            </div>
             
-            {pastRooms.length === 0 ? (
+            {getFilteredSessions().length === 0 ? (
               <div className="bg-gray-800/30 rounded-2xl p-6 text-center">
-                <p className="text-gray-500">No past watch sessions yet</p>
+                <p className="text-gray-500">
+                  {pastSessionsView === 'created' 
+                    ? 'No watch sessions created by you yet' 
+                    : 'No watch sessions joined yet'}
+                </p>
               </div>
             ) : (
               <div className="bg-gray-800/30 rounded-2xl overflow-hidden">
@@ -390,13 +542,16 @@ const WatchTogether = () => {
                   <thead>
                     <tr className="border-b border-gray-700">
                       <th className="text-left py-4 px-4 text-gray-400 font-medium">Movie</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium hidden md:table-cell">Date</th>
+                      <th className="text-left py-4 px-4 text-gray-400 font-medium hidden md:table-cell">
+                        {pastSessionsView === 'created' ? 'Date' : 'Host'}
+                      </th>
                       <th className="text-left py-4 px-4 text-gray-400 font-medium hidden md:table-cell">Duration</th>
                       <th className="text-left py-4 px-4 text-gray-400 font-medium">Attendees</th>
+                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pastRooms.slice(0, 10).map((room) => (
+                    {getFilteredSessions().slice(0, 10).map((room) => (
                       <tr key={room._id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
@@ -415,7 +570,10 @@ const WatchTogether = () => {
                           </div>
                         </td>
                         <td className="py-4 px-4 text-gray-400 hidden md:table-cell">
-                          {formatDate(room.startTime)}
+                          {pastSessionsView === 'created' 
+                            ? formatDate(room.startTime)
+                            : (room.host?.name || room.host?.nickName || 'Unknown Host')
+                          }
                         </td>
                         <td className="py-4 px-4 text-gray-400 hidden md:table-cell">
                           {formatDuration(room.startTime, room.endTime)}
@@ -423,8 +581,53 @@ const WatchTogether = () => {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-1">
                             <Users className="w-4 h-4 text-gray-500" />
-                            <span className="text-gray-400">{room.attendees?.length || 0}</span>
+                            <span className="text-gray-400">{room.attendees?.length || room.participants?.length || 0}</span>
                           </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          {pastSessionsView === 'created' ? (
+                            // For "Created by me" - show Live or Closed
+                            room.status === 'active' ? (
+                              <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs flex items-center gap-1 w-fit">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                Live
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 bg-gray-600/30 text-gray-400 rounded-full text-xs flex items-center gap-1 w-fit">
+                                <X className="w-3 h-3" />
+                                Closed
+                              </span>
+                            )
+                          ) : (
+                            // For "Joined by me" - show Join/Live/Rejoin/Closed based on userStatus
+                            room.userStatus === 'invited' ? (
+                              <button
+                                onClick={() => handleAcceptInvite(room._id)}
+                                className="px-3 py-1.5 bg-gold hover:bg-gold/80 text-black font-semibold rounded-full text-xs flex items-center gap-1 w-fit transition-colors"
+                              >
+                                <CheckCircle className="w-3 h-3" />
+                                Accept Invite
+                              </button>
+                            ) : room.userStatus === 'joined' ? (
+                              <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs flex items-center gap-1 w-fit">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                Live
+                              </span>
+                            ) : room.userStatus === 'left' ? (
+                              <button
+                                onClick={() => handleRejoinRoom(room._id)}
+                                className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full text-xs flex items-center gap-1 w-fit transition-colors"
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                Rejoin
+                              </button>
+                            ) : (
+                              <span className="px-2 py-1 bg-gray-600/30 text-gray-400 rounded-full text-xs flex items-center gap-1 w-fit">
+                                <X className="w-3 h-3" />
+                                Closed
+                              </span>
+                            )
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -432,6 +635,7 @@ const WatchTogether = () => {
                 </table>
               </div>
             )}
+
           </section>
         </>
       )}

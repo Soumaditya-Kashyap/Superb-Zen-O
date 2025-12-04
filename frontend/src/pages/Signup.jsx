@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import {  AnimatePresence } from 'framer-motion';
+import {  AnimatePresence , motion } from 'framer-motion';
 import { Mail, Lock, User, Phone, Eye, EyeOff, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 const Signup = ({ setIsAuthenticated }) => {

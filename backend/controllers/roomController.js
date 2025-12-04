@@ -207,11 +207,12 @@ exports.getRoomHistory = async (req, res) => {
 
         console.log('[ROOM] Getting history for user:', userId);
 
-        // Find all rooms where user is host or participant
+        // Find all rooms where user is host, participant, or was an attendee
         const rooms = await WatchRoom.find({
             $or: [
                 { host: userId },
-                { participants: userId }
+                { participants: userId },
+                { 'attendees.user': userId }
             ]
         })
         .populate('host', 'name nickName')
@@ -221,14 +222,51 @@ exports.getRoomHistory = async (req, res) => {
         .skip((page - 1) * limit)
         .limit(parseInt(limit));
 
+        // Process rooms to add user's attendance status
+        const processedRooms = rooms.map(room => {
+            const roomObj = room.toObject();
+            
+            // Check if user is the host
+            const isHost = room.host._id.toString() === userId || room.host.toString() === userId;
+            
+            // Find user's attendance record
+            const userAttendance = room.attendees?.find(
+                a => a.user?.toString() === userId || a.user?._id?.toString() === userId
+            );
+            
+            // Determine user's status in this room
+            let userStatus = 'not_joined';
+            if (isHost) {
+                userStatus = room.status === 'ended' ? 'ended' : 'hosting';
+            } else if (userAttendance) {
+                if (room.status === 'ended') {
+                    userStatus = 'ended'; // Room is closed by host
+                } else if (userAttendance.leftAt) {
+                    userStatus = 'left'; // User left but room is still active
+                } else {
+                    userStatus = 'joined'; // User is currently in the room
+                }
+            } else if (room.participants?.some(p => p._id?.toString() === userId || p.toString() === userId)) {
+                // User is participant but hasn't joined yet
+                userStatus = room.status === 'ended' ? 'ended' : 'invited';
+            }
+            
+            return {
+                ...roomObj,
+                userStatus,
+                isHost
+            };
+        });
+
         // Separate into active and past rooms
-        const activeRooms = rooms.filter(room => room.status === 'active');
-        const pastRooms = rooms.filter(room => room.status === 'ended');
+        const activeRooms = processedRooms.filter(room => room.status === 'active');
+        const pastRooms = processedRooms.filter(room => room.status === 'ended');
 
         const total = await WatchRoom.countDocuments({
             $or: [
                 { host: userId },
-                { participants: userId }
+                { participants: userId },
+                { 'attendees.user': userId }
             ]
         });
 
