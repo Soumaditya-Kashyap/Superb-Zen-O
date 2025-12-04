@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, ChevronDown, Film, ChevronLeft, X, Loader } from "lucide-react";
+import { Search, ChevronDown, Film, ChevronLeft, X, Loader } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import MovieService from "../services/movieService";
+import NotificationMenu from "./NotificationMenu";
 
 const TopNavbar = ({ 
   showBackButton = false, 
@@ -339,20 +340,8 @@ const TopNavbar = ({
 
         {/* Notifications & Profile */}
         <div className="flex items-center gap-4">
-          {/* TODO: Add notification functionality */}
-
-          {/* Notifications */}
-          <motion.button
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            whileTap={{ scale: 0.9 }}
-            className="relative p-3 bg-gradient-to-br from-gold/15 to-gold-light/10 
-            hover:from-gold/20 hover:to-gold-light/15 
-            rounded-xl border border-gold/30 shadow-lg shadow-gold/10"
-          >
-            <Bell size={22} className="text-gold" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 
-            bg-red-500 rounded-full animate-pulse shadow-red-500/50" />
-          </motion.button>
+          {/* Notifications Menu */}
+          <NotificationMenu />
 
           {/* Profile */}
           <motion.button

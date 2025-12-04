@@ -4,6 +4,7 @@ const Connection = require('../models/Connection');
 const User = require('../models/user');
 const ChatRoom = require('../models/ChatRoom');
 const Message = require('../models/Message');
+const notificationService = require('../utils/notificationService');
 
 /**
  * Create a new watch room
@@ -164,6 +165,15 @@ exports.createRoom = async (req, res) => {
 
                         console.log('[ROOM] Invite message saved for friend:', friendId);
                     }
+                    
+                    // Also send a notification for the watch invite
+                    await notificationService.notifyWatchInvite(
+                        friendId,
+                        hostId,
+                        host.nickName || host.name,
+                        room._id,
+                        movie.Title
+                    );
                 } catch (msgErr) {
                     console.error('[ROOM] Failed to send invite to friend:', friendId, msgErr.message);
                 }
@@ -523,18 +533,30 @@ exports.endRoom = async (req, res) => {
 
         await room.save();
 
+        // Get host info for notification
+        const host = await User.findById(userId).select('name nickName');
+
         // Emit socket event to notify all participants that room is closed
         const io = req.app.get('io');
         if (io) {
             // Notify all participants (except host) that room is closed
-            room.participants.forEach(participantId => {
+            for (const participantId of room.participants) {
                 if (participantId.toString() !== userId) {
                     io.to(`user:${participantId}`).emit('room:closed', {
                         roomId: room._id,
                         message: 'The host has closed this room'
                     });
+                    
+                    // Send room ended notification
+                    await notificationService.notifyRoomEnded(
+                        participantId,
+                        userId,
+                        host.nickName || host.name,
+                        room._id,
+                        room.name
+                    );
                 }
-            });
+            }
             
             // Also emit to the room itself for anyone currently watching
             io.to(`watch:${roomId}`).emit('room:closed', {

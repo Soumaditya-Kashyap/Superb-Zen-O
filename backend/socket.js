@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Message = require('./models/Message');
 const ChatRoom = require('./models/ChatRoom');
 const User = require('./models/user');
+const notificationService = require('./utils/notificationService');
 
 // Store online users: { odObjectId: socketId }
 const onlineUsers = new Map();
@@ -179,6 +180,20 @@ function initializeSocket(httpServer) {
                             createdAt: message.createdAt
                         }
                     });
+                    
+                    // Send notification for the new message
+                    const messagePreview = message.content.length > 30 
+                        ? message.content.substring(0, 30) + '...' 
+                        : message.content;
+                    
+                    await notificationService.notifyMessage(
+                        otherParticipant.toString(),
+                        userId,
+                        socket.user.nickName || socket.user.name,
+                        messagePreview,
+                        chatRoomId,
+                        io
+                    );
                 }
 
             } catch (error) {

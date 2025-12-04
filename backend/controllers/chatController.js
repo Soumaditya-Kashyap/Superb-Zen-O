@@ -3,6 +3,7 @@ const Connection = require('../models/Connection');
 const ChatRoom = require('../models/ChatRoom');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
+const notificationService = require('../utils/notificationService');
 
 /**
  * Search users by name or nickName
@@ -150,6 +151,16 @@ exports.sendHandshake = async (req, res) => {
 
         console.log('[CHAT] Handshake sent successfully, connection ID: ' + connection._id);
 
+        // Get sender info for notification
+        const sender = await User.findById(senderId).select('name nickName');
+        
+        // Send friend request notification to receiver
+        await notificationService.notifyFriendRequest(
+            receiverId,
+            senderId,
+            sender.nickName || sender.name
+        );
+
         res.status(201).json({
             success: true,
             message: 'Handshake sent successfully',
@@ -230,6 +241,16 @@ exports.acceptHandshake = async (req, res) => {
 
         // Populate sender info for response
         await connection.populate('sender', 'name nickName profilePicture');
+
+        // Get current user info for notification
+        const currentUser = await User.findById(currentUserId).select('name nickName');
+        
+        // Notify the original sender that their request was accepted
+        await notificationService.notifyFriendAccepted(
+            connection.sender._id,
+            currentUserId,
+            currentUser.nickName || currentUser.name
+        );
 
         res.json({
             success: true,

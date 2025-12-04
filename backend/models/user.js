@@ -52,6 +52,19 @@ const userSchema = new mongoose.Schema({
     favorites: {
         type: [String],
         default: []
+    },
+    // Movies the user wants to be notified about when available
+    movieRequests: {
+        type: [String],
+        default: []
+    },
+    // Notification preferences
+    notificationSettings: {
+        email: { type: Boolean, default: true },
+        push: { type: Boolean, default: true },
+        friendRequests: { type: Boolean, default: true },
+        watchParty: { type: Boolean, default: true },
+        movieAlerts: { type: Boolean, default: true }
     }
     
 }, { timestamps: true });

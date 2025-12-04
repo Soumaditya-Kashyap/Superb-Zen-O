@@ -6,10 +6,21 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/database');
 const errorHandler = require('./middlewares/errorHandler');
 const requestLogger = require('./middlewares/requestLogger');
-const { initializeSocket } = require('./socket');
 
-// Load environment variables
+// Load environment variables first
 dotenv.config();
+
+// Pre-load all models to ensure they're registered before any service uses them
+require('./models/user');
+require('./models/movie');
+require('./models/Connection');
+require('./models/ChatRoom');
+require('./models/Message');
+require('./models/WatchRoom');
+require('./models/Notification');
+
+const { initializeSocket } = require('./socket');
+const notificationService = require('./utils/notificationService');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,6 +34,9 @@ const io = initializeSocket(server);
 
 // Make io accessible in routes/controllers
 app.set('io', io);
+
+// Register io with notification service for global access
+notificationService.setSocketIO(io);
 
 // Middleware - Allow all origins in development for testing with teammates
 const allowedOrigins = process.env.NODE_ENV === 'production' 
@@ -52,6 +66,7 @@ app.use('/api/movies', require('./routes/movies'));
 app.use('/api/video', require('./routes/video'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/rooms', require('./routes/rooms'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Error handling middleware
 app.use(errorHandler);

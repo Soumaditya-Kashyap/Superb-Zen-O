@@ -10,4 +10,8 @@ router.post('/scrape/genre/:genre', adminController.scrapeGenre);
 // Statistics
 router.get('/stats', adminController.getStats);
 
+// Movie video management
+router.post('/movies/:movieId/set-video', adminController.setMovieVideo);
+router.get('/movies/:movieId/requesters', adminController.getMovieRequesters);
+
 module.exports = router;
