@@ -170,6 +170,30 @@ exports.createRoom = async (req, res) => {
             }
         }
 
+        // Emit room:created event to all invited friends
+        const io = req.app.get('io');
+        if (io && validFriends.length > 0) {
+            const roomData = {
+                _id: room._id,
+                name: room.name,
+                host: room.host,
+                movie: room.movie,
+                participants: room.participants,
+                inviteCode: room.inviteCode,
+                status: room.status,
+                startTime: room.startTime,
+                createdAt: room.createdAt,
+                attendees: room.attendees,
+                isHost: false,
+                userStatus: 'invited'
+            };
+
+            for (const friendId of validFriends) {
+                io.to(`user:${friendId}`).emit('room:created', { room: roomData });
+                console.log('[ROOM] 📢 Room created notification sent to:', friendId);
+            }
+        }
+
         res.status(201).json({
             success: true,
             message: 'Watch room created successfully',
@@ -183,7 +207,9 @@ exports.createRoom = async (req, res) => {
                 inviteLink: room.inviteLink,
                 status: room.status,
                 startTime: room.startTime,
-                createdAt: room.createdAt
+                createdAt: room.createdAt,
+                isHost: true,
+                userStatus: 'hosting'
             }
         });
 

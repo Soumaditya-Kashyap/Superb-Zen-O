@@ -66,6 +66,19 @@ const WatchTogether = () => {
       console.log('[WATCH] ✅ Socket connected for room updates');
     });
 
+    // Listen for new room created (when someone invites you)
+    socket.on('room:created', (data) => {
+      console.log('[WATCH] 🎬 New room invite received:', data.room?._id);
+      if (data.room) {
+        // Add to activeRooms if not already there
+        setActiveRooms(prev => {
+          const exists = prev.some(r => r._id === data.room._id);
+          if (exists) return prev;
+          return [data.room, ...prev];
+        });
+      }
+    });
+
     // Listen for room closed event
     socket.on('room:closed', (data) => {
       console.log('[WATCH] 🚪 Room closed by host:', data.roomId);
