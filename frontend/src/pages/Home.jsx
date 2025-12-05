@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { 
- 
   ChevronDown,
+  ChevronRight,
   Film,
   ArrowUp,
   Sparkles,
   Star,
   Globe,
   TrendingUp,
-  Heart
+  Heart,
+  ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -619,22 +620,54 @@ const Home = () => {
                     
                     <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gold/30 scrollbar-track-transparent hover:scrollbar-thumb-gold/50 transition-all">
                       {category.movies && category.movies.length > 0 ? (
-                        category.movies.map((movie, movieIdx) => (
-                          <motion.div 
-                            key={movie.imdbID}
+                        <>
+                          {category.movies.map((movie, movieIdx) => (
+                            <motion.div 
+                              key={movie.imdbID}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: idx * 0.1 + movieIdx * 0.02, duration: 0.3 }}
+                              whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
+                              className="flex-none w-[200px]"
+                            >
+                              <MovieCard 
+                                movie={movie} 
+                                onClick={handleMovieClick}
+                                isPersonalized={category.isPersonalized}
+                              />
+                            </motion.div>
+                          ))}
+                          
+                          {/* View More / View Full List Card */}
+                          <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.1 + movieIdx * 0.02, duration: 0.3 }}
                             whileHover={{ scale: 1.05, y: -8, transition: { duration: 0.2 } }}
-                            className="flex-none w-[200px]"
+                            onClick={() => {
+                              // Check if this is the Trending category
+                              if (category.title.includes('Trending')) {
+                                navigate('/trending');
+                              } else {
+                                // Determine category type and navigate
+                                const categorySlug = category.genre || category.title.replace(/ - For You$/, '').replace(/ Movies$/, '').trim();
+                                const categoryType = category.isLanguageCategory ? 'language' : 
+                                                     category.isPersonalized ? 'genre' : 'category';
+                                navigate(`/category/${encodeURIComponent(categorySlug)}?title=${encodeURIComponent(category.title)}&type=${categoryType}`);
+                              }
+                            }}
+                            className="flex-none w-[200px] h-[350px] bg-gradient-to-br from-gold/20 via-gold/10 to-transparent border-2 border-gold/30 hover:border-gold/60 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all group/viewmore"
                           >
-                            <MovieCard 
-                              movie={movie} 
-                              onClick={handleMovieClick}
-                              isPersonalized={category.isPersonalized}
-                            />
+                            <div className="w-16 h-16 rounded-full bg-gold/20 group-hover/viewmore:bg-gold/30 flex items-center justify-center mb-4 transition-all">
+                              <ArrowRight className="w-8 h-8 text-gold group-hover/viewmore:translate-x-1 transition-transform" />
+                            </div>
+                            <span className="text-gold font-bold text-lg">
+                              {category.title.includes('Trending') ? 'View Full List' : 'View More'}
+                            </span>
+                            <span className="text-gold/60 text-sm mt-1 text-center px-4">
+                              {category.title.includes('Trending') ? 'See top 30 trending' : 'See all movies'}
+                            </span>
                           </motion.div>
-                        ))
+                        </>
                       ) : (
                         <div className="flex items-center justify-center w-full py-10">
                           <p className="text-white/40 text-lg">No movies available in this category</p>

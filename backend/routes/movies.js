@@ -16,10 +16,16 @@ router.get('/personalized', authMiddleware, movieController.getPersonalizedMovie
 router.post('/favorite', authMiddleware, movieController.toggleFavorite);
 router.get('/favorites/list', authMiddleware, movieController.getFavorites);
 
-// Get movie by ID
-router.get('/:id', movieController.getMovieById);
+// Get movies by genre (must be before /:id route)
+router.get('/genre/:genre', movieController.getMoviesByGenre);
 
-// Get movies by category
+// Get movies by language (must be before /:id route)
+router.get('/language/:language', movieController.getMoviesByLanguage);
+
+// Get movies by category (must be before /:id route)
 router.get('/category/:category', movieController.getMoviesByCategory);
+
+// Get movie by ID (this should be last as it's a catch-all pattern)
+router.get('/:id', movieController.getMovieById);
 
 module.exports = router;

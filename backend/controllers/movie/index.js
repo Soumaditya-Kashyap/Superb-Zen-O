@@ -11,6 +11,8 @@ module.exports = {
     getPersonalizedMovies: personalizedController.getPersonalizedMovies,
     getMovieById: detailsController.getMovieById,
     getMoviesByCategory: categoryController.getMoviesByCategory,
+    getMoviesByGenre: categoryController.getMoviesByGenre,
+    getMoviesByLanguage: categoryController.getMoviesByLanguage,
     toggleFavorite: favoritesController.toggleFavorite,
     getFavorites: favoritesController.getFavorites
 };

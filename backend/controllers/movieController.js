@@ -4,6 +4,8 @@ const {
     getPersonalizedMovies,
     getMovieById,
     getMoviesByCategory,
+    getMoviesByGenre,
+    getMoviesByLanguage,
     toggleFavorite,
     getFavorites
 } = require('./movie');
@@ -14,6 +16,8 @@ module.exports = {
     getPersonalizedMovies,
     getMovieById,
     getMoviesByCategory,
+    getMoviesByGenre,
+    getMoviesByLanguage,
     toggleFavorite,
     getFavorites
 };

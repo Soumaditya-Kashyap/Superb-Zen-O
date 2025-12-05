@@ -7,6 +7,8 @@ import Chat from './pages/Chat';
 import Wish from './pages/Wish';
 import Sparks from './pages/Sparks';
 import Categories from './pages/Categories';
+import CategoryMovies from './pages/CategoryMovies';
+import TrendingList from './pages/TrendingList';
 import MusicPage from './pages/MusicPage';
 import Support from './pages/Support';
 import SettingsPage from './pages/SettingsPage';
@@ -118,6 +120,12 @@ function AppContent() {
           } />
           <Route path="/categories" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Categories /></ProtectedRoute>
+          } />
+          <Route path="/category/:categoryName" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><CategoryMovies /></ProtectedRoute>
+          } />
+          <Route path="/trending" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><TrendingList /></ProtectedRoute>
           } />
           <Route path="/sparks" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Sparks /></ProtectedRoute>
