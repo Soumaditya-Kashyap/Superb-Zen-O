@@ -123,39 +123,83 @@ exports.acceptHandshake = async (req, res) => {
 
         console.log('[CHAT] Accept handshake, connection ID: ' + connectionId);
 
-        const connection = await Connection.findById(connectionId);
+        // Atomically accept only if this request is still pending and current user is receiver.
+        // This prevents race conditions where one request accepts and another fails midway.
+        let connection = await Connection.findOneAndUpdate(
+            {
+                _id: connectionId,
+                receiver: currentUserId,
+                status: 'pending'
+            },
+            { $set: { status: 'accepted' } },
+            { new: true }
+        );
 
+        // If no pending match, inspect existing record and return a stable/idempotent response.
         if (!connection) {
-            return res.status(404).json({
-                success: false,
-                message: 'Connection not found'
+            const existingConnection = await Connection.findById(connectionId);
+
+            if (!existingConnection) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Connection not found'
+                });
+            }
+
+            if (existingConnection.receiver.toString() !== currentUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only the receiver can accept this handshake'
+                });
+            }
+
+            if (existingConnection.status !== 'accepted') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Handshake is not pending'
+                });
+            }
+
+            // Already accepted earlier: ensure chat room exists and return success.
+            const existingChatRoom = await ChatRoom.findOneAndUpdate(
+                { connectionId: existingConnection._id },
+                {
+                    $setOnInsert: {
+                        participants: [existingConnection.sender, existingConnection.receiver],
+                        connectionId: existingConnection._id
+                    }
+                },
+                { new: true, upsert: true }
+            );
+
+            await existingConnection.populate('sender', 'name nickName profilePicture');
+
+            return res.json({
+                success: true,
+                message: 'Handshake already accepted',
+                connection: {
+                    _id: existingConnection._id,
+                    status: existingConnection.status,
+                    sender: existingConnection.sender
+                },
+                chatRoom: {
+                    _id: existingChatRoom._id,
+                    participants: existingChatRoom.participants
+                }
             });
         }
 
-        // Only receiver can accept
-        if (connection.receiver.toString() !== currentUserId) {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the receiver can accept this handshake'
-            });
-        }
-
-        if (connection.status === 'accepted') {
-            return res.status(400).json({
-                success: false,
-                message: 'Handshake already accepted'
-            });
-        }
-
-        // Update connection status
-        connection.status = 'accepted';
-        await connection.save();
-
-        // Create chat room for the two users
-        const chatRoom = await ChatRoom.create({
-            participants: [connection.sender, connection.receiver],
-            connectionId: connection._id
-        });
+        // Create chat room idempotently for the two users.
+        const chatRoom = await ChatRoom.findOneAndUpdate(
+            { connectionId: connection._id },
+            {
+                $setOnInsert: {
+                    participants: [connection.sender, connection.receiver],
+                    connectionId: connection._id
+                }
+            },
+            { new: true, upsert: true }
+        );
 
         console.log('[CHAT] Handshake accepted, chat room created: ' + chatRoom._id);
 

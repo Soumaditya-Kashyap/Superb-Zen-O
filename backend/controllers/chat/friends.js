@@ -32,17 +32,21 @@ exports.getFriends = async (req, res) => {
             connectionId: { $in: connectionIds }
         }).populate('lastMessage');
 
-        // Map friends with chat room info
-        const friends = connections.map(conn => {
-            const friend = conn.sender._id.toString() === currentUserId 
-                ? conn.receiver 
-                : conn.sender;
+        // Map friends with chat room info and dedupe by friend ID for data consistency.
+        const friendsMap = new Map();
+
+        connections.forEach(conn => {
+            const isSenderCurrent = conn.sender?._id?.toString() === currentUserId;
+            const friend = isSenderCurrent ? conn.receiver : conn.sender;
+
+            // Skip corrupted entries instead of crashing entire list.
+            if (!friend || !friend._id) return;
 
             const chatRoom = chatRooms.find(
                 cr => cr.connectionId.toString() === conn._id.toString()
             );
 
-            return {
+            const friendData = {
                 _id: friend._id,
                 name: friend.name,
                 nickName: friend.nickName,
@@ -52,7 +56,14 @@ exports.getFriends = async (req, res) => {
                 lastMessage: chatRoom?.lastMessage || null,
                 lastMessageAt: chatRoom?.lastMessageAt || conn.updatedAt
             };
+
+            const existing = friendsMap.get(friend._id.toString());
+            if (!existing || new Date(friendData.lastMessageAt) > new Date(existing.lastMessageAt)) {
+                friendsMap.set(friend._id.toString(), friendData);
+            }
         });
+
+        const friends = Array.from(friendsMap.values());
 
         // Sort by last message time
         friends.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
