@@ -6,6 +6,7 @@
 const User = require('../../models/user');
 const Connection = require('../../models/Connection');
 const ChatRoom = require('../../models/ChatRoom');
+const Message = require('../../models/Message');
 const notificationService = require('../../utils/notificationService');
 
 /**
@@ -268,13 +269,24 @@ exports.rejectHandshake = async (req, res) => {
             });
         }
 
+        const wasAccepted = connection.status === 'accepted';
+
+        if (wasAccepted) {
+            // Defriend flow: remove chat room and messages to fully terminate chat access.
+            const chatRoom = await ChatRoom.findOne({ connectionId: connection._id });
+            if (chatRoom) {
+                await Message.deleteMany({ chatRoomId: chatRoom._id });
+                await ChatRoom.findByIdAndDelete(chatRoom._id);
+            }
+        }
+
         await Connection.findByIdAndDelete(connectionId);
 
-        console.log('[CHAT] Handshake rejected/cancelled');
+        console.log(wasAccepted ? '[CHAT] Friendship removed' : '[CHAT] Handshake rejected/cancelled');
 
         res.json({
             success: true,
-            message: 'Handshake cancelled'
+            message: wasAccepted ? 'Friend removed successfully' : 'Handshake cancelled'
         });
 
     } catch (error) {

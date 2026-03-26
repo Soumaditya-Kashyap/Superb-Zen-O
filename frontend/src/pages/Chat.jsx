@@ -45,6 +45,9 @@ const Chat = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState({});
   const [socketConnected, setSocketConnected] = useState(false);
+  const [showUnfriendModal, setShowUnfriendModal] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState(null);
+  const [removingFriend, setRemovingFriend] = useState(false);
   
   // Refs
   const socketRef = useRef(null);
@@ -333,6 +336,53 @@ const Chat = () => {
       }
     } catch (error) {
       console.error('Error rejecting handshake:', error);
+    }
+  };
+
+  const removeFriend = (friend) => {
+    setFriendToRemove(friend);
+    setShowUnfriendModal(true);
+  };
+
+  const closeUnfriendModal = () => {
+    if (removingFriend) return;
+    setShowUnfriendModal(false);
+    setFriendToRemove(null);
+  };
+
+  const confirmRemoveFriend = async () => {
+    if (!friendToRemove?.connectionId) return;
+
+    try {
+      setRemovingFriend(true);
+      const response = await fetch(`${API_BASE_URL}/chat/handshake/${friendToRemove.connectionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include'
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // If current active chat was with removed friend, close it.
+        if (activeFriend?._id) {
+          const removed = friends.find(
+            f => f.connectionId === friendToRemove.connectionId && f._id === activeFriend._id
+          );
+          if (removed) {
+            setActiveFriend(null);
+            setActiveChatRoom(null);
+            setMessages([]);
+          }
+        }
+
+        fetchFriends();
+        fetchPendingHandshakes();
+        closeUnfriendModal();
+      }
+    } catch (error) {
+      console.error('Error removing friend:', error);
+    } finally {
+      setRemovingFriend(false);
     }
   };
 
@@ -653,7 +703,19 @@ const Chat = () => {
                       <p className="text-white/50 text-sm">@{friend.nickName}</p>
                     </div>
                   </div>
-                  <MessageCircle className="text-gold opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFriend(friend);
+                      }}
+                      className="px-2.5 py-1.5 text-xs bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                      title="Remove friend"
+                    >
+                      Unfriend
+                    </button>
+                    <MessageCircle className="text-gold opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
+                  </div>
                 </div>
               ))
             ) : (
@@ -698,6 +760,16 @@ const Chat = () => {
                 <p className="text-white font-medium truncate">{friend.name}</p>
                 <p className="text-white/50 text-sm truncate">@{friend.nickName}</p>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFriend(friend);
+                }}
+                className="px-2 py-1 text-[11px] bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 rounded-md transition-colors"
+                title="Remove friend"
+              >
+                Unfriend
+              </button>
             </div>
           ))}
         </div>
@@ -918,6 +990,50 @@ const Chat = () => {
         >
           {activeView === 'connect' ? renderConnectView() : renderChatView()}
         </motion.div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showUnfriendModal && friendToRemove && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeUnfriendModal}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-md bg-[#111317] border border-white/10 rounded-2xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold text-white mb-2">Remove Friend?</h3>
+              <p className="text-white/70 mb-6 leading-relaxed">
+                Are you sure you want to remove <span className="text-white font-semibold">{friendToRemove.name}</span> from your friends list?
+                You will need to send a new handshake request to connect again.
+              </p>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={closeUnfriendModal}
+                  disabled={removingFriend}
+                  className="px-4 py-2 rounded-lg border border-white/15 text-white/80 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemoveFriend}
+                  disabled={removingFriend}
+                  className="px-4 py-2 rounded-lg bg-red-500/90 hover:bg-red-500 text-white font-semibold transition-colors disabled:opacity-50"
+                >
+                  {removingFriend ? 'Removing...' : 'Yes, Unfriend'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
