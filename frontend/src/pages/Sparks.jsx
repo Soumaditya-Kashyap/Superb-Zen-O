@@ -7,7 +7,7 @@ const Sparks = () => {
     { id: 3, title: "Cast Interviews", thumbnail: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300&h=300&fit=crop" },
     { id: 4, title: "Fan Theories", thumbnail: "https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=300&h=300&fit=crop" },
     { id: 5, title: "Movie Facts", thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=300&fit=crop" },
-    { id: 6, title: "Bloopers", thumbnail: "https://images.unsplash.com/photo-1574267432644-f74e8cee3dd3?w=300&h=300&fit=crop" },
+    { id: 6, title: "Bloopers", thumbnail: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=300&h=300&fit=crop" },
   ];
 
   return (

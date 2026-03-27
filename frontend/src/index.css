@@ -66,3 +66,17 @@
     @apply bg-black/70 backdrop-blur-xl border border-gold/20;
   }
 }
+
+
+@keyframes equalize {
+  0% { transform: scaleY(.3); }
+  25% { transform: scaleY(1); }
+  50% { transform: scaleY(.5); }
+  75% { transform: scaleY(.9); }
+  100% { transform: scaleY(.4); }
+}
+
+.animate-eq{
+  transform-origin: bottom;
+  animation: equalize 0.7s infinite ease-in-out;
+}

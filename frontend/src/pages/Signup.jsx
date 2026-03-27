@@ -34,11 +34,11 @@ const Signup = ({ setIsAuthenticated }) => {
   ];
 
   const genres = [
-    { id: 'action', name: 'Action', image: 'https://images.unsplash.com/photo-1574267432644-f74e8cee3dd3?w=200&h=200&fit=crop' },
+    { id: 'action', name: 'Action', image: 'https://images.unsplash.com/photo-1502139214982-d0ad755818d8?w=200&h=200&fit=crop' },
     { id: 'romance', name: 'Romance', image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=200&h=200&fit=crop' },
     { id: 'comedy', name: 'Comedy', image: 'https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=200&h=200&fit=crop' },
     { id: 'thriller', name: 'Thriller', image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200&h=200&fit=crop' },
-    { id: 'horror', name: 'Horror', image: 'https://images.unsplash.com/photo-1603513492128-ba7bc9b3e143?w=200&h=200&fit=crop' },
+    { id: 'horror', name: 'Horror', image: 'https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=200&h=200&fit=crop' },
     { id: 'scifi', name: 'Sci-Fi', image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=200&h=200&fit=crop' },
     { id: 'drama', name: 'Drama', image: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=200&h=200&fit=crop' },
     { id: 'animation', name: 'Animation', image: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=200&h=200&fit=crop' },
