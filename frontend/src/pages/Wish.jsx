@@ -22,8 +22,9 @@ import { Upload, Youtube } from "lucide-react";
 import TopNavbar from "../components/TopNavbar";
 
 
+
 // your youtube api key
-const API_KEY = "AIzaSyAKGfMj1tdFUBPLfr3ItCAtJK0YMnCwR4I";
+const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 
 export default function Wish() {
 
@@ -77,42 +78,30 @@ export default function Wish() {
   FETCH YOUTUBE VIDEOS
   ===============================
   */
-  const fetchVideos = async () => {
+ const fetchVideos = async () => {
+  console.log("API KEY =", API_KEY);
 
-    const res = await axios.get(
-      "https://www.googleapis.com/youtube/v3/search",
-      {
-        params: {
+  if (!search) return;
 
-          part: "snippet",
-
-          maxResults: 20,
-
-          q: search,
-
-          key: API_KEY,
-
-          type: "video"
-
-        }
+  const res = await axios.get(
+    "https://www.googleapis.com/youtube/v3/search",
+    {
+      params: {
+        part: "snippet",
+        maxResults: 12,
+        q: search,
+        type: "video",
+        key: API_KEY
       }
-    );
-
-
-    setVideos(res.data.items);
-
-
-    // auto play first video
-    if (res.data.items.length > 0) {
-
-      setCurrentVideo(
-        res.data.items[0].id.videoId
-      );
-
     }
+  );
 
-  };
+  setVideos(res.data.items);
 
+  if (res.data.items.length > 0) {
+    setCurrentVideo(res.data.items[0].id.videoId);
+  }
+};
 
 
   /*
