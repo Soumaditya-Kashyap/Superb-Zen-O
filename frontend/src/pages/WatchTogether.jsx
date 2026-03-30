@@ -138,8 +138,10 @@ const WatchTogether = () => {
     setActiveRooms(prev => [room, ...prev]);
   };
 
-  const handleEnterRoom = (roomId) => {
-    navigate(`/room/${roomId}`);
+  const handleEnterRoom = (room) => {
+    const roomIdentifier = room?.inviteCode || room?._id;
+    if (!roomIdentifier) return;
+    navigate(`/watch-together/join/${roomIdentifier}`);
   };
 
   // Check if current user is the host of a room
@@ -301,7 +303,7 @@ const WatchTogether = () => {
       if (response.ok) {
         setShowJoinModal(false);
         setJoinCode('');
-        navigate(`/room/${data.room._id}`);
+        navigate(`/watch-together/join/${data.room.inviteCode || data.room._id}`);
       } else {
         setJoinError(data.error || 'Failed to join room');
       }
@@ -508,7 +510,7 @@ const WatchTogether = () => {
                       {/* Actions */}
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleEnterRoom(room._id)}
+                          onClick={() => handleEnterRoom(room)}
                           className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gold text-black font-semibold rounded-lg hover:bg-gold/90 transition-colors"
                         >
                           <Play className="w-4 h-4" />

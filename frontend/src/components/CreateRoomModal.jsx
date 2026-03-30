@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Film,
@@ -19,6 +20,7 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -501,7 +503,7 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
 
             {step === 3 && (
               <button
-                onClick={() => window.location.href = `/watch-together/room/${createdRoom._id}`}
+                onClick={() => navigate(`/watch-together/join/${createdRoom.inviteCode || createdRoom._id}`)}
                 className="flex items-center gap-2 px-6 py-3 bg-gold hover:bg-gold-light text-black font-bold rounded-xl transition-colors"
               >
                 <Play className="w-5 h-5" />

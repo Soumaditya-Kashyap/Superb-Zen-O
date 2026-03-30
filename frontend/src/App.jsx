@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import WatchTogether from './pages/WatchTogether';
+import WatchRoom from './pages/WatchRoom';
 import Chat from './pages/Chat';
 import Wish from './pages/Wish';
 import Sparks from './pages/Sparks';
@@ -111,6 +112,9 @@ function AppContent() {
           } />
           <Route path="/watch-together" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><WatchTogether /></ProtectedRoute>
+          } />
+          <Route path="/watch-together/join/:roomId" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><WatchRoom /></ProtectedRoute>
           } />
           <Route path="/chat" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><Chat /></ProtectedRoute>
