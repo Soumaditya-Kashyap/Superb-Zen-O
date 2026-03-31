@@ -35,7 +35,8 @@ exports.getRoom = async (req, res) => {
             { path: 'host', select: 'name nickName' },
             { path: 'movie', select: 'Title Poster videoFolderName Runtime Genre Year Plot' },
             { path: 'participants', select: 'name nickName' },
-            { path: 'attendees.user', select: 'name nickName' }
+            { path: 'attendees.user', select: 'name nickName' },
+            { path: 'messages.sender', select: 'name nickName' }
         ]);
 
         res.json({
