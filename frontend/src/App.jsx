@@ -17,6 +17,7 @@ import MySpace from './pages/MySpace';
 import MoviePlayer from './pages/MoviePlayer';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import About from './components/About';
 
 import AdminLogin from './admin/AdminLogin';
 import AdminRegister from './admin/AdminRegister';
@@ -149,6 +150,12 @@ function AppContent() {
           <Route path="/player/:imdbId" element={
             <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><MoviePlayer /></ProtectedRoute>
           } />
+
+            <Route path="/about" element={
+            <ProtectedRoute setIsAuthenticated={setIsAuthenticated}><About /></ProtectedRoute>
+          } />
+
+
           <Route path="*" element={
             <Navigate to={isAuthenticated ? "/" : "/auth"} replace />
           } />

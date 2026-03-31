@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const SettingsPage = () => {
   return (
     <div className="min-h-screen p-10">
@@ -9,6 +11,9 @@ const SettingsPage = () => {
             This feature will be developed in the next phase. Customize your experience!
           </p>
         </div>
+        <Link to="/about" className="mt-6 text-gold hover:text-white">
+          About
+        </Link>
       </div>
     </div>
   );
