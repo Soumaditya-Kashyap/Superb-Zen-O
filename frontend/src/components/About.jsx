@@ -142,7 +142,7 @@ const About = () => {
             <div> emoji reactions</div>
             <div> adaptive video quality</div>
             <div> group recommendations</div>
-            <div>⚡ high performance player</div>
+            <div>high performance player</div>
 
           </div>
 
