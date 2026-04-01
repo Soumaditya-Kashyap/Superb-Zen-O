@@ -59,7 +59,7 @@ const Footer = () => {
             animate={{ opacity: 1, y: 0 }}
           >
             <h2 className="text-xl font-semibold text-yellow-400">
-              🎬 Superb
+               Superb
             </h2>
 
             <p className="text-gray-400 text-sm mt-3">
@@ -95,7 +95,7 @@ const Footer = () => {
             transition={{ delay: 0.1 }}
           >
             <h3 className="text-lg text-yellow-400 mb-3">
-              🔗 Links
+               Links
             </h3>
 
             <div className="flex flex-col gap-2 text-gray-400">
@@ -116,7 +116,7 @@ const Footer = () => {
             transition={{ delay: 0.2 }}
           >
             <h3 className="text-lg text-yellow-400 mb-3">
-              🛠 Tech
+               Tech
             </h3>
 
             <div className="flex flex-wrap gap-2 text-sm">
@@ -146,7 +146,7 @@ const Footer = () => {
             transition={{ delay: 0.3 }}
           >
             <h3 className="text-lg text-yellow-400 mb-3">
-              👨‍💻 Developer Touch
+               Developer Touch
             </h3>
 
             <p className="text-gray-400 text-sm mb-3">
