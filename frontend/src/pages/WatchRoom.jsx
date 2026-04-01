@@ -11,6 +11,13 @@ const SAMPLE_VIDEO_URL =
   import.meta.env.VITE_WATCHROOM_SAMPLE_VIDEO_URL ||
   'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
 
+// Sync configuration constants
+const SYNC_THRESHOLD = 1.5; // Only sync if drift > 1.5 seconds
+const HEARTBEAT_INTERVAL = 7000; // Send heartbeat every 7 seconds
+const BUFFER_DELAY = 200; // Buffer delay before play (ms)
+const SUPPRESS_EMIT_DURATION = 650; // Suppress emits after programmatic change (ms)
+const PROGRAMMATIC_FLAG_DURATION = 180; // How long programmatic flag stays true (ms)
+
 const WatchRoom = () => {
   const { roomId } = useParams();
   const [roomData, setRoomData] = useState(null);
@@ -34,6 +41,8 @@ const WatchRoom = () => {
   const suppressEmitsUntilRef = useRef(0);
   const pendingVideoStateRef = useRef(null);
   const initialSyncAppliedRef = useRef(false);
+  const heartbeatIntervalRef = useRef(null);
+  const lastHeartbeatTimeRef = useRef(0);
 
   const currentUser = useMemo(() => {
     try {
@@ -44,6 +53,7 @@ const WatchRoom = () => {
   }, []);
 
   const currentUserId = currentUser.id || currentUser._id;
+
 
   const normalizeId = (value) => {
     if (!value) return '';
@@ -64,18 +74,30 @@ const WatchRoom = () => {
     !!normalizeId(currentUserId) && normalizeId(currentUserId) === hostUserId;
   const hasPlaybackControl = canControlPlayback || isRoomHost;
 
-  const applyRemoteVideoState = async (video, state) => {
+  /**
+   * Apply remote video state with threshold-based syncing
+   * Only jumps if drift > SYNC_THRESHOLD to avoid micro-stuttering
+   */
+  const applyRemoteVideoState = async (video, state, forceSync = false) => {
     if (!video || !state) return;
 
     isProgrammaticRef.current = true;
-    suppressEmitsUntilRef.current = Date.now() + 650;
+    suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
     const targetTime = Number(state.currentTime || 0);
-    if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.45) {
-      video.currentTime = targetTime;
+    const currentTime = video.currentTime;
+    const drift = Math.abs(currentTime - targetTime);
+
+    // Only sync time if drift exceeds threshold OR it's a forced sync (seek/initial)
+    if (forceSync || drift > SYNC_THRESHOLD) {
+      if (Number.isFinite(targetTime)) {
+        video.currentTime = targetTime;
+        console.log(`[SYNC] Time corrected: ${currentTime.toFixed(2)}s → ${targetTime.toFixed(2)}s (drift: ${drift.toFixed(2)}s)`);
+      }
     }
 
-    if (state.isPlaying) {
+    // Handle play/pause state
+    if (state.isPlaying && video.paused) {
       try {
         await video.play();
       } catch {
@@ -83,18 +105,56 @@ const WatchRoom = () => {
           video.muted = true;
           await video.play();
         } catch {
-          // ignore if browser blocks autoplay
+          // Ignore autoplay blocks
         }
       }
-    } else {
+    } else if (!state.isPlaying && !video.paused) {
       video.pause();
     }
 
     setTimeout(() => {
       isProgrammaticRef.current = false;
-    }, 180);
+    }, PROGRAMMATIC_FLAG_DURATION);
   };
 
+  /**
+   * Start heartbeat sync for users with playback control
+   * Sends periodic state updates to keep everyone in sync
+   */
+  const startHeartbeat = () => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+    }
+
+    heartbeatIntervalRef.current = setInterval(() => {
+      const socket = socketRef.current;
+      const video = videoRef.current;
+      
+      if (!socket || !video || !hasPlaybackControl) return;
+      if (isProgrammaticRef.current) return;
+      if (Date.now() < suppressEmitsUntilRef.current) return;
+
+      // Only send heartbeat if video is playing
+      if (!video.paused) {
+        socket.emit('video-heartbeat', {
+          roomId: resolvedRoomId || roomId,
+          time: video.currentTime || 0,
+          isPlaying: !video.paused
+        });
+        lastHeartbeatTimeRef.current = Date.now();
+        console.log(`[HEARTBEAT] Sent: time=${video.currentTime.toFixed(2)}s`);
+      }
+    }, HEARTBEAT_INTERVAL);
+  };
+
+  const stopHeartbeat = () => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  };
+
+  // Fetch room data
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token || !roomId) return;
@@ -140,6 +200,7 @@ const WatchRoom = () => {
     fetchRoom();
   }, [roomId]);
 
+  // Setup video source (HLS or fallback)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return undefined;
@@ -147,7 +208,7 @@ const WatchRoom = () => {
     const folder = roomData?.movie?.videoFolderName;
     const hlsUrl = folder ? `${CLOUDFRONT_BASE_URL}/${folder}/master.m3u8` : null;
 
-    // Cleanup any previous HLS instance before setting a new source
+    // Cleanup any previous HLS instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
@@ -160,12 +221,13 @@ const WatchRoom = () => {
       return undefined;
     }
 
-    // Use native HLS on Safari, Hls.js on other modern browsers
+    // Use native HLS on Safari
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = hlsUrl;
       return undefined;
     }
 
+    // Use Hls.js on other browsers
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -199,6 +261,8 @@ const WatchRoom = () => {
     };
   }, [roomData?.movie?.videoFolderName]);
 
+
+  // Socket.IO connection and event handlers
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token || !roomId) return undefined;
@@ -238,9 +302,8 @@ const WatchRoom = () => {
           : [];
 
         setControllerUserIds(controllers);
-        setCanControlPlayback(
-          !!payload.permissions.canControl || controllers.includes(normalizeId(currentUserId))
-        );
+        const hasControl = !!payload.permissions.canControl || controllers.includes(normalizeId(currentUserId));
+        setCanControlPlayback(hasControl);
       }
 
       if (payload?.videoState) {
@@ -249,12 +312,12 @@ const WatchRoom = () => {
         const video = videoRef.current;
         if (video) {
           if (video.readyState >= 1) {
-            applyRemoteVideoState(video, payload.videoState);
+            applyRemoteVideoState(video, payload.videoState, true); // Force initial sync
             pendingVideoStateRef.current = null;
           } else {
             const onLoaded = () => {
               if (pendingVideoStateRef.current) {
-                applyRemoteVideoState(video, pendingVideoStateRef.current);
+                applyRemoteVideoState(video, pendingVideoStateRef.current, true);
                 pendingVideoStateRef.current = null;
               }
             };
@@ -287,7 +350,8 @@ const WatchRoom = () => {
         : [];
 
       setControllerUserIds(controllers);
-      setCanControlPlayback(controllers.includes(normalizeId(currentUserId)));
+      const hasControl = controllers.includes(normalizeId(currentUserId));
+      setCanControlPlayback(hasControl);
     });
 
     socket.on('user-disconnected', (payload) => {
@@ -307,72 +371,114 @@ const WatchRoom = () => {
       });
     });
 
-    const applyProgrammaticUpdate = (updater) => {
+    /**
+     * IMPROVED: video-play handler with buffering
+     */
+    socket.on('video-play', async (payload) => {
       const video = videoRef.current;
       if (!video) return;
-      isProgrammaticRef.current = true;
-      suppressEmitsUntilRef.current = Date.now() + 650;
-      updater(video);
-      setTimeout(() => {
-        isProgrammaticRef.current = false;
-      }, 180);
-    };
-
-    socket.on('video-play', (payload) => {
-      const video = videoRef.current;
-      if (!video) return;
+      
       const targetTime = Number(payload?.time);
+      const bufferDelay = payload?.bufferDelay || BUFFER_DELAY;
 
-      applyProgrammaticUpdate((v) => {
-        if (Number.isFinite(targetTime) && Math.abs(v.currentTime - targetTime) > 0.6) {
-          v.currentTime = targetTime;
+      isProgrammaticRef.current = true;
+      suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+
+      // Set time if drift is significant
+      if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.6) {
+        video.currentTime = targetTime;
+      }
+
+      // Buffer before playing for smooth sync
+      setTimeout(async () => {
+        try {
+          await video.play();
+          console.log(`[SYNC] Play received: time=${targetTime.toFixed(2)}s`);
+        } catch (err) {
+          console.warn('[SYNC] Play failed:', err.message);
         }
-        v.play().catch(() => {});
-      });
+        
+        setTimeout(() => {
+          isProgrammaticRef.current = false;
+        }, PROGRAMMATIC_FLAG_DURATION);
+      }, bufferDelay);
     });
 
+    /**
+     * IMPROVED: video-pause handler
+     */
     socket.on('video-pause', (payload) => {
       const video = videoRef.current;
       if (!video) return;
+      
       const targetTime = Number(payload?.time);
 
-      applyProgrammaticUpdate((v) => {
-        if (Number.isFinite(targetTime) && Math.abs(v.currentTime - targetTime) > 0.6) {
-          v.currentTime = targetTime;
-        }
-        v.pause();
-      });
+      isProgrammaticRef.current = true;
+      suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+
+      if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.6) {
+        video.currentTime = targetTime;
+      }
+      video.pause();
+      console.log(`[SYNC] Pause received: time=${targetTime.toFixed(2)}s`);
+
+      setTimeout(() => {
+        isProgrammaticRef.current = false;
+      }, PROGRAMMATIC_FLAG_DURATION);
     });
 
+    /**
+     * IMPROVED: video-seek handler
+     */
     socket.on('video-seek', (payload) => {
       const video = videoRef.current;
       if (!video) return;
+      
       const targetTime = Number(payload?.time);
       if (!Number.isFinite(targetTime)) return;
 
-      applyProgrammaticUpdate((v) => {
-        v.currentTime = targetTime;
-      });
+      isProgrammaticRef.current = true;
+      suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+
+      video.currentTime = targetTime;
+      console.log(`[SYNC] Seek received: time=${targetTime.toFixed(2)}s`);
+
+      setTimeout(() => {
+        isProgrammaticRef.current = false;
+      }, PROGRAMMATIC_FLAG_DURATION);
     });
 
-    socket.on('video-sync', (payload) => {
+    /**
+     * IMPROVED: video-heartbeat handler with threshold-based sync
+     */
+    socket.on('video-heartbeat', (payload) => {
       const video = videoRef.current;
       if (!video) return;
 
       const targetTime = Number(payload?.time);
       const shouldPlay = !!payload?.isPlaying;
 
-      applyProgrammaticUpdate((v) => {
-        if (Number.isFinite(targetTime) && Math.abs(v.currentTime - targetTime) > 1.0) {
-          v.currentTime = targetTime;
-        }
+      // Only apply if drift exceeds threshold
+      const drift = Math.abs(video.currentTime - targetTime);
+      
+      if (drift > SYNC_THRESHOLD && Number.isFinite(targetTime)) {
+        isProgrammaticRef.current = true;
+        suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+        
+        video.currentTime = targetTime;
+        console.log(`[HEARTBEAT] Corrected drift: ${drift.toFixed(2)}s`);
+        
+        setTimeout(() => {
+          isProgrammaticRef.current = false;
+        }, PROGRAMMATIC_FLAG_DURATION);
+      }
 
-        if (shouldPlay && v.paused) {
-          v.play().catch(() => {});
-        } else if (!shouldPlay && !v.paused) {
-          v.pause();
-        }
-      });
+      // Sync play/pause state
+      if (shouldPlay && video.paused) {
+        video.play().catch(() => {});
+      } else if (!shouldPlay && !video.paused) {
+        video.pause();
+      }
     });
 
     socket.on('error', (payload) => {
@@ -382,7 +488,7 @@ const WatchRoom = () => {
       }
     });
 
-    // Keep current user visible in participants list even before others join.
+    // Add current user to participants list
     setActiveUsers((prev) => {
       if (!myId) return prev;
       const exists = prev.some((u) => (u.id || u._id) === myId);
@@ -391,6 +497,7 @@ const WatchRoom = () => {
     });
 
     return () => {
+      stopHeartbeat();
       socket.emit('leave-room', {
         roomId,
         userId: myId
@@ -400,14 +507,31 @@ const WatchRoom = () => {
     };
   }, [roomId, currentUser, currentUserId]);
 
+  // Start/stop heartbeat based on playback control
+  useEffect(() => {
+    if (hasPlaybackControl) {
+      startHeartbeat();
+    } else {
+      stopHeartbeat();
+    }
+
+    return () => {
+      stopHeartbeat();
+    };
+  }, [hasPlaybackControl, resolvedRoomId, roomId]);
+
+  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // Reset initial sync flag on room change
   useEffect(() => {
     initialSyncAppliedRef.current = false;
   }, [roomId]);
 
+
+  // Apply initial video state from room data
   useEffect(() => {
     const video = videoRef.current;
     const state = roomData?.videoState;
@@ -419,7 +543,7 @@ const WatchRoom = () => {
       await applyRemoteVideoState(video, {
         currentTime: state.currentTime || 0,
         isPlaying: !!state.isPlaying,
-      });
+      }, true); // Force initial sync
     };
 
     const onLoadedMetadata = () => {
@@ -437,6 +561,7 @@ const WatchRoom = () => {
     };
   }, [roomData?.videoState?.currentTime, roomData?.videoState?.isPlaying]);
 
+  // Helper functions
   const getSenderName = (sender) => {
     if (!sender) return 'Unknown';
     if (typeof sender === 'string') return normalizeId(sender) === normalizeId(currentUserId) ? 'You' : 'User';
@@ -482,6 +607,9 @@ const WatchRoom = () => {
     }
   };
 
+  /**
+   * IMPROVED: Emit video sync events with timestamp for race condition prevention
+   */
   const emitVideoSync = (eventName) => {
     const socket = socketRef.current;
     const video = videoRef.current;
@@ -492,30 +620,18 @@ const WatchRoom = () => {
 
     socket.emit(eventName, {
       roomId: resolvedRoomId || roomId,
-      time: video.currentTime || 0
+      time: video.currentTime || 0,
+      clientTimestamp: Date.now() // For race condition prevention
     });
+
+    console.log(`[EMIT] ${eventName}: time=${video.currentTime.toFixed(2)}s`);
   };
 
   const handleVideoPlay = () => emitVideoSync('video-play');
   const handleVideoPause = () => emitVideoSync('video-pause');
   const handleVideoSeeked = () => emitVideoSync('video-seek');
-  const handleVideoTimeUpdate = () => {
-    const socket = socketRef.current;
-    const video = videoRef.current;
-    if (!socket || !video || isProgrammaticRef.current) return;
-    if (!hasPlaybackControl) return;
-    if (Date.now() < suppressEmitsUntilRef.current) return;
 
-    const now = Date.now();
-    if (!video.paused && now - lastSyncEmitRef.current > 800) {
-      lastSyncEmitRef.current = now;
-      socket.emit('video-sync', {
-        roomId: resolvedRoomId || roomId,
-        time: video.currentTime || 0,
-        isPlaying: !video.paused
-      });
-    }
-  };
+  // Removed the aggressive timeupdate sync - heartbeat handles it now
 
   const canUserControlPlayback = (user) => {
     const targetId = normalizeId(user?.id || user?._id);
@@ -583,7 +699,6 @@ const WatchRoom = () => {
                 onPlay={handleVideoPlay}
                 onPause={handleVideoPause}
                 onSeeked={handleVideoSeeked}
-                onTimeUpdate={handleVideoTimeUpdate}
                 poster={roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A' ? roomData.movie.Poster : undefined}
               >
                 <source src={SAMPLE_VIDEO_URL} type="video/mp4" />
