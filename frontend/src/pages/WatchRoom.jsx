@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Hls from 'hls.js';
 
@@ -19,6 +19,7 @@ const SUPPRESS_EMIT_DURATION = 650; // Suppress emits after programmatic change 
 const PROGRAMMATIC_FLAG_DURATION = 180; // How long programmatic flag stays true (ms)
 
 const WatchRoom = () => {
+  const navigate = useNavigate();
   const { roomId } = useParams();
   const [roomData, setRoomData] = useState(null);
   const [resolvedRoomId, setResolvedRoomId] = useState(roomId);
@@ -31,6 +32,9 @@ const WatchRoom = () => {
   const [videoError, setVideoError] = useState('');
   const [canControlPlayback, setCanControlPlayback] = useState(false);
   const [controllerUserIds, setControllerUserIds] = useState([]);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState('');
+  const [leavingRoom, setLeavingRoom] = useState(false);
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -43,6 +47,7 @@ const WatchRoom = () => {
   const initialSyncAppliedRef = useRef(false);
   const heartbeatIntervalRef = useRef(null);
   const lastHeartbeatTimeRef = useRef(0);
+  const intentionalLeaveRef = useRef(false);
 
   const currentUser = useMemo(() => {
     try {
@@ -152,6 +157,50 @@ const WatchRoom = () => {
       clearInterval(heartbeatIntervalRef.current);
       heartbeatIntervalRef.current = null;
     }
+  };
+
+  const leaveRoomNow = () => {
+    const socket = socketRef.current;
+    const userId = normalizeId(currentUserId);
+    const targetRoomId = resolvedRoomId || roomId;
+
+    stopHeartbeat();
+
+    if (socket) {
+      if (targetRoomId) {
+        socket.emit('leave-room', {
+          roomId: targetRoomId,
+          userId
+        });
+      }
+      socket.disconnect();
+      socketRef.current = null;
+    }
+  };
+
+  const openLeaveConfirmation = (targetPath = '/watch-together') => {
+    setPendingNavigationPath(targetPath);
+    setShowLeaveConfirmModal(true);
+  };
+
+  const cancelLeave = () => {
+    if (leavingRoom) return;
+    setShowLeaveConfirmModal(false);
+    setPendingNavigationPath('');
+  };
+
+  const confirmLeave = () => {
+    if (leavingRoom) return;
+
+    setLeavingRoom(true);
+    intentionalLeaveRef.current = true;
+    leaveRoomNow();
+
+    const nextPath = pendingNavigationPath || '/watch-together';
+    setShowLeaveConfirmModal(false);
+    setPendingNavigationPath('');
+    setLeavingRoom(false);
+    navigate(nextPath);
   };
 
   // Fetch room data
@@ -498,12 +547,18 @@ const WatchRoom = () => {
 
     return () => {
       stopHeartbeat();
-      socket.emit('leave-room', {
-        roomId,
-        userId: myId
-      });
-      socket.disconnect();
-      socketRef.current = null;
+      if (!intentionalLeaveRef.current) {
+        socket.emit('leave-room', {
+          roomId,
+          userId: myId
+        });
+      }
+      if (socket.connected) {
+        socket.disconnect();
+      }
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
     };
   }, [roomId, currentUser, currentUserId]);
 
@@ -519,6 +574,66 @@ const WatchRoom = () => {
       stopHeartbeat();
     };
   }, [hasPlaybackControl, resolvedRoomId, roomId]);
+
+  useEffect(() => {
+    const handleAnchorNavigation = (event) => {
+      if (intentionalLeaveRef.current) return;
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const anchor = event.target?.closest?.('a[href]');
+      if (!anchor) return;
+      if (anchor.target === '_blank') return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return;
+      }
+
+      const targetUrl = new URL(href, window.location.origin);
+      if (targetUrl.origin !== window.location.origin) return;
+
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const targetPath = `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+      if (targetPath === currentPath) return;
+
+      event.preventDefault();
+      openLeaveConfirmation(targetPath);
+    };
+
+    document.addEventListener('click', handleAnchorNavigation, true);
+    return () => {
+      document.removeEventListener('click', handleAnchorNavigation, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (intentionalLeaveRef.current) return;
+      event.preventDefault();
+      event.returnValue = 'If you go to another page, you will exit the room.';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (intentionalLeaveRef.current) return;
+      window.history.pushState({ watchRoomGuard: true }, '', window.location.href);
+      openLeaveConfirmation('/watch-together');
+    };
+
+    window.history.pushState({ watchRoomGuard: true }, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -679,7 +794,16 @@ const WatchRoom = () => {
         <section className="md:col-span-8 xl:col-span-9 bg-[#0b0f18] border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col min-h-[300px] md:min-h-0">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl sm:text-2xl font-bold">Watch Room</h1>
-            <span className="text-xs sm:text-sm text-white/60">Room: {roomData?.name || roomId}</span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-xs sm:text-sm text-white/60">Room: {roomData?.name || roomId}</span>
+              <button
+                type="button"
+                onClick={() => openLeaveConfirmation('/watch-together')}
+                className="px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 text-xs sm:text-sm font-semibold hover:bg-red-500/20 transition-colors"
+              >
+                Leave Room
+              </button>
+            </div>
           </div>
 
           {videoError && (
@@ -800,6 +924,36 @@ const WatchRoom = () => {
           </div>
         </aside>
       </div>
+
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 z-[1200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#101625] p-5 sm:p-6 shadow-2xl">
+            <h3 className="text-lg sm:text-xl font-bold text-white">Leave Watch Room?</h3>
+            <p className="mt-2 text-sm text-white/70">
+              Are you sure? If you go to another page, you will be out of this room.
+            </p>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={cancelLeave}
+                className="px-4 py-2 rounded-lg border border-white/15 text-white/80 hover:bg-white/10 transition-colors"
+                disabled={leavingRoom}
+              >
+                Stay Here
+              </button>
+              <button
+                type="button"
+                onClick={confirmLeave}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors disabled:opacity-60"
+                disabled={leavingRoom}
+              >
+                {leavingRoom ? 'Leaving...' : 'Leave Room'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
