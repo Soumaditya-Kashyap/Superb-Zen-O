@@ -1,5 +1,12 @@
 import React from "react";
 import { motion } from "framer-motion";
+import {
+  FaGithub,
+  FaLinkedin,
+  FaInstagram,
+  FaYoutube,
+  FaGlobe
+} from "react-icons/fa";
 
 const Footer = () => {
 
@@ -7,6 +14,34 @@ const Footer = () => {
     whileHover: { scale: 1.1, y: -2 },
     transition: { type: "spring", stiffness: 300 }
   };
+
+  const social = [
+    {
+      icon: <FaGithub />,
+      link: "https://github.com/",
+      color: "hover:text-white"
+    },
+    {
+      icon: <FaLinkedin />,
+      link: "https://linkedin.com/",
+      color: "hover:text-blue-400"
+    },
+    {
+      icon: <FaInstagram />,
+      link: "https://instagram.com/",
+      color: "hover:text-pink-400"
+    },
+    {
+      icon: <FaYoutube />,
+      link: "https://youtube.com/",
+      color: "hover:text-red-500"
+    },
+    {
+      icon: <FaGlobe />,
+      link: "#",
+      color: "hover:text-yellow-400"
+    }
+  ];
 
   return (
     <footer className="mt-20 border-t border-zinc-800 bg-black/40 backdrop-blur-md">
@@ -24,12 +59,31 @@ const Footer = () => {
             animate={{ opacity: 1, y: 0 }}
           >
             <h2 className="text-xl font-semibold text-yellow-400">
-              🎬 Superb Song
+              🎬 Superb
             </h2>
 
             <p className="text-gray-400 text-sm mt-3">
               Watch videos together with synchronized playback and modern UI.
             </p>
+
+            {/* social icons */}
+            <div className="flex gap-4 mt-4 text-lg text-gray-400">
+
+              {social.map((s, i) => (
+                <motion.a
+                  key={i}
+                  href={s.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.25, rotate: 5 }}
+                  className={`${s.color} transition`}
+                >
+                  {s.icon}
+                </motion.a>
+              ))}
+
+            </div>
+
           </motion.div>
 
 
@@ -103,12 +157,14 @@ const Footer = () => {
               whileHover={{ scale: 1.05 }}
               className="bg-zinc-900 border border-zinc-800 rounded-xl p-3"
             >
-                <p className="text-white font-medium">
+              <p className="text-white font-medium">
                 Soumaditya Kashyap
               </p>
+
               <p className="text-white font-medium">
                 Rakibul Hussain
               </p>
+
               <p className="text-white font-medium">
                 Sekander Ali
               </p>

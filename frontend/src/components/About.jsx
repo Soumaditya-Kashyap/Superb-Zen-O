@@ -56,7 +56,7 @@ const About = () => {
           </h2>
 
           <p className="text-gray-300 leading-relaxed">
-            Superb Song is a collaborative OTT streaming platform where users can watch videos together 
+            Superb  is a collaborative OTT streaming platform where users can watch videos together 
             using synchronized playback. It creates a virtual cinema environment where friends can enjoy 
             content together even when they are in different locations.
           </p>
