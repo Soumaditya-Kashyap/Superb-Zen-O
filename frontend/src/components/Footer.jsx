@@ -187,7 +187,7 @@ const Footer = () => {
           transition={{ delay: 0.5 }}
           className="text-center text-gray-500 text-sm mt-12"
         >
-          © {new Date().getFullYear()} Superb Song • Built with ❤️ using modern web technologies
+          © {new Date().getFullYear()} Superb  • Built with ❤️ using modern web technologies
         </motion.div>
 
       </div>
