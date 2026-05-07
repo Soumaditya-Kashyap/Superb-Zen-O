@@ -18,6 +18,27 @@ const BUFFER_DELAY = 200; // Buffer delay before play (ms)
 const SUPPRESS_EMIT_DURATION = 650; // Suppress emits after programmatic change (ms)
 const PROGRAMMATIC_FLAG_DURATION = 180; // How long programmatic flag stays true (ms)
 
+// Debug logging configuration
+const DEBUG_MODE = import.meta.env.DEV || false; // Enable detailed logging in development only
+
+// Centralized logger utility
+const logger = {
+  debug: (...args) => {
+    if (DEBUG_MODE) console.log(...args);
+  },
+  info: (...args) => console.log(...args),
+  warn: (...args) => console.warn(...args),
+  error: (...args) => console.error(...args),
+};
+
+// User data validation helper
+const validateUserData = (user) => {
+  if (!user || typeof user !== 'object') return false;
+  const hasId = user.id || user._id;
+  const hasName = user.name || user.nickName;
+  return !!(hasId && hasName);
+};
+
 const WatchRoom = () => {
   const navigate = useNavigate();
   const { roomId } = useParams();
@@ -35,6 +56,7 @@ const WatchRoom = () => {
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const [pendingNavigationPath, setPendingNavigationPath] = useState('');
   const [leavingRoom, setLeavingRoom] = useState(false);
+  const [refreshingParticipants, setRefreshingParticipants] = useState(false);
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -322,7 +344,8 @@ const WatchRoom = () => {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      timeout: 20000
+      timeout: 20000,
+      autoConnect: false // Don't connect automatically
     });
 
     socketRef.current = socket;
@@ -330,7 +353,13 @@ const WatchRoom = () => {
     const myId = currentUser.id || currentUser._id;
     const myName = currentUser.nickName || currentUser.name || 'You';
 
+    // Register ALL event listeners BEFORE connecting
     socket.on('connect', () => {
+      console.log('[WATCH ROOM] ========== SOCKET CONNECTED ==========');
+      console.log('[WATCH ROOM] Socket ID:', socket.id);
+      console.log('[WATCH ROOM] Joining room:', roomId);
+      console.log('[WATCH ROOM] User:', myName, '(ID:', myId, ')');
+      
       socket.emit('join-room', {
         roomId,
         user: {
@@ -338,9 +367,21 @@ const WatchRoom = () => {
           name: myName
         }
       });
+      
+      console.log('[WATCH ROOM] join-room event emitted');
+      
+      // FORCE REQUEST PARTICIPANTS after a short delay
+      setTimeout(() => {
+        console.log('[WATCH ROOM] Force requesting participants after join');
+        socket.emit('request-room-users', { roomId });
+      }, 500);
+      
+      console.log('[WATCH ROOM] ========== END CONNECT ==========');
     });
 
     socket.on('room-joined', (payload) => {
+      console.log('[WATCH ROOM] Room joined:', payload);
+      
       if (payload?.roomId) {
         setResolvedRoomId(normalizeId(payload.roomId));
       }
@@ -374,9 +415,16 @@ const WatchRoom = () => {
           }
         }
       }
+      
+      // FORCE REQUEST PARTICIPANTS after room-joined
+      setTimeout(() => {
+        console.log('[WATCH ROOM] Force requesting participants after room-joined');
+        socket.emit('request-room-users', { roomId: payload?.roomId || roomId });
+      }, 300);
     });
 
     socket.on('user-connected', (payload) => {
+      console.log('[WATCH ROOM] User connected:', payload);
       const incomingUser = payload?.user || payload;
       const incomingId = incomingUser?.id || incomingUser?._id;
       if (!incomingId) return;
@@ -384,13 +432,33 @@ const WatchRoom = () => {
       setActiveUsers((prev) => {
         const exists = prev.some((u) => (u.id || u._id) === incomingId);
         if (exists) return prev;
+        console.log('[WATCH ROOM] Adding user to local state:', incomingUser.nickName || incomingUser.name);
         return [...prev, incomingUser];
       });
     });
 
     socket.on('room-users', (payload) => {
+      logger.debug('[WATCH ROOM] room-users event received');
+      
+      // Validate and sanitize user data
       const users = Array.isArray(payload?.users) ? payload.users : [];
-      setActiveUsers(users);
+      const validUsers = users.filter(validateUserData);
+      
+      // Log validation issues
+      if (validUsers.length !== users.length) {
+        logger.warn(
+          `[WATCH ROOM] Filtered ${users.length - validUsers.length} invalid user(s) from participant list`
+        );
+      }
+      
+      // Update state with validated users
+      setActiveUsers(validUsers);
+      
+      // Concise production log
+      logger.info(
+        `[WATCH ROOM] Participants updated: ${validUsers.length} user(s)`,
+        DEBUG_MODE ? validUsers.map(u => u.nickName || u.name) : ''
+      );
     });
 
     socket.on('playback:control-state', (payload) => {
@@ -404,9 +472,14 @@ const WatchRoom = () => {
     });
 
     socket.on('user-disconnected', (payload) => {
+      console.log('[WATCH ROOM] User disconnected:', payload);
       const leavingId = payload?.userId || payload?.id || payload?._id;
       if (!leavingId) return;
-      setActiveUsers((prev) => prev.filter((u) => (u.id || u._id) !== leavingId));
+      setActiveUsers((prev) => {
+        const filtered = prev.filter((u) => (u.id || u._id) !== leavingId);
+        console.log('[WATCH ROOM] User removed. Remaining:', filtered.length);
+        return filtered;
+      });
     });
 
     socket.on('watch:message:received', (payload) => {
@@ -537,13 +610,9 @@ const WatchRoom = () => {
       }
     });
 
-    // Add current user to participants list
-    setActiveUsers((prev) => {
-      if (!myId) return prev;
-      const exists = prev.some((u) => (u.id || u._id) === myId);
-      if (exists) return prev;
-      return [...prev, { id: myId, name: myName, nickName: currentUser.nickName }];
-    });
+    // NOW connect the socket after all listeners are registered
+    console.log('[WATCH ROOM] All event listeners registered, connecting socket...');
+    socket.connect();
 
     return () => {
       stopHeartbeat();
@@ -574,6 +643,13 @@ const WatchRoom = () => {
       stopHeartbeat();
     };
   }, [hasPlaybackControl, resolvedRoomId, roomId]);
+
+  // Debug: Log whenever activeUsers changes
+  useEffect(() => {
+    console.log('[WATCH ROOM] *** activeUsers state changed ***');
+    console.log('[WATCH ROOM] New count:', activeUsers.length);
+    console.log('[WATCH ROOM] Users:', activeUsers.map(u => u.nickName || u.name).join(', '));
+  }, [activeUsers]);
 
   useEffect(() => {
     const handleAnchorNavigation = (event) => {
@@ -769,6 +845,38 @@ const WatchRoom = () => {
     });
   };
 
+  const handleRefreshParticipants = () => {
+    const socket = socketRef.current;
+    if (!socket || refreshingParticipants) return;
+
+    setRefreshingParticipants(true);
+    console.log('[WATCH ROOM] ========== MANUAL REFRESH TRIGGERED ==========');
+    console.log('[WATCH ROOM] Current activeUsers count:', activeUsers.length);
+    console.log('[WATCH ROOM] Requesting participant list from server...');
+
+    // Request updated participant list from server
+    socket.emit('request-room-users', {
+      roomId: resolvedRoomId || roomId
+    }, (ack) => {
+      console.log('[WATCH ROOM] Refresh acknowledgment:', ack);
+      if (ack?.success === false) {
+        console.error('[WATCH ROOM] Failed to refresh participants:', ack?.message);
+        alert('Failed to refresh participants: ' + (ack?.message || 'Unknown error'));
+      } else {
+        console.log('[WATCH ROOM] Refresh successful, user count:', ack?.userCount);
+      }
+      setRefreshingParticipants(false);
+    });
+
+    // Also set a timeout fallback
+    setTimeout(() => {
+      if (refreshingParticipants) {
+        console.log('[WATCH ROOM] Refresh timeout, resetting state');
+        setRefreshingParticipants(false);
+      }
+    }, 3000);
+  };
+
   if (loadingRoom) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -839,7 +947,30 @@ const WatchRoom = () => {
           <div className="flex-1 min-h-0 border border-white/10 rounded-xl p-3 sm:p-4 bg-[#0f1421]">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">Participants</h2>
-              <span className="text-xs text-white/60">{activeUsers.length} online</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/60">{activeUsers.length} online</span>
+                <button
+                  type="button"
+                  onClick={handleRefreshParticipants}
+                  disabled={refreshingParticipants}
+                  className="p-1.5 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Refresh participants"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 text-white/70 ${refreshingParticipants ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-full pr-1">
