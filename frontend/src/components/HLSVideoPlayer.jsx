@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,14 +15,19 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
+// Constants
+const CONTROLS_HIDE_DELAY = 3000;
+const CONTROLS_QUICK_HIDE_DELAY = 500;
+const QUALITY_SWITCH_DELAY = 100;
+const STREAM_SOURCE = 'CloudFront';
+
+const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSeeked, controlsDisabled = false }, ref) => {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const containerRef = useRef(null);
   const progressBarRef = useRef(null);
   const controlsRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
-  const bandwidthMonitorRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -39,7 +43,16 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
   const [error, setError] = useState(null);
   const [buffering, setBuffering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
-  const [streamSource, setStreamSource] = useState('CloudFront');
+
+  // Expose video ref to parent component
+  useImperativeHandle(ref, () => ({
+    get video() {
+      return videoRef.current;
+    },
+    get hls() {
+      return hlsRef.current;
+    }
+  }), []); // Empty deps - refs are stable
 
   useEffect(() => {
     const video = videoRef.current;
@@ -71,7 +84,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
       hls.attachMedia(video);
 
       // HLS Events
-      hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
         // Extract quality levels
         const qualities = data.levels.map((level, index) => ({
           index,
@@ -85,13 +98,13 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
         setIsLoading(false);
         
         // Auto-play
-        video.play().catch(err => {
-          console.log('⚠️  Autoplay prevented:', err);
+        video.play().catch((err) => {
+          console.warn('Autoplay prevented:', err.message);
           setIsLoading(false);
         });
       });
 
-      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
         const quality = hls.levels[data.level];
         if (hls.autoLevelEnabled) {
           setCurrentQuality(`Auto (${quality.height}p)`);
@@ -100,7 +113,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
         }
       });
 
-      hls.on(Hls.Events.ERROR, (event, data) => {
+      hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -149,9 +162,6 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
-      if (bandwidthMonitorRef.current) {
-        clearInterval(bandwidthMonitorRef.current);
-      }
     };
   }, [streamUrl]);
 
@@ -162,10 +172,19 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
     const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      if (onPlay && !controlsDisabled) onPlay();
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      if (onPause && !controlsDisabled) onPause();
+    };
     const handleWaiting = () => setBuffering(true);
     const handleCanPlay = () => setBuffering(false);
+    const handleSeeked = () => {
+      if (onSeeked && !controlsDisabled) onSeeked();
+    };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('durationchange', handleDurationChange);
@@ -173,6 +192,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
     video.addEventListener('pause', handlePause);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('seeked', handleSeeked);
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -181,17 +201,18 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('seeked', handleSeeked);
     };
-  }, []);
+  }, [onPlay, onPause, onSeeked, controlsDisabled]);
   // Sync video element volume with state
   useEffect(() => {
-  if (videoRef.current) {
-    videoRef.current.volume = volume;
-  }
-}, [volume]);
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+    }
+  }, [volume]);
 
   // Controls visibility - keep visible when hovering
-  const handleMouseMove = () => {
+  const handleMouseMove = useCallback(() => {
     setShowControls(true);
     
     if (controlsTimeoutRef.current) {
@@ -204,73 +225,90 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
         if (!isHoveringControls) {
           setShowControls(false);
         }
-      }, 3000);
+      }, CONTROLS_HIDE_DELAY);
     }
-  };
+  }, [isHoveringControls, isPlaying]);
   
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     setShowControls(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
-  };
+  }, []);
   
-  const handleControlsMouseEnter = () => {
+  const handleControlsMouseEnter = useCallback(() => {
     setIsHoveringControls(true);
     setShowControls(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
-  };
+  }, []);
   
-  const handleControlsMouseLeave = () => {
+  const handleControlsMouseLeave = useCallback(() => {
     setIsHoveringControls(false);
     
     // Start hide timer when leaving controls
     if (isPlaying) {
       controlsTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
-      }, 3000);
+      }, CONTROLS_HIDE_DELAY);
     }
-  };
+  }, [isPlaying]);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
+    if (!video) return;
+    
     if (video.paused) {
       video.play();
     } else {
       video.pause();
     }
-  };
+  }, []);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const video = videoRef.current;
+    if (!video) return;
+    
     video.muted = !video.muted;
     setIsMuted(video.muted);
-  };
+  }, []);
 
-  const handleVolumeChange = (e) => {
+  const handleVolumeChange = useCallback((e) => {
     const newVolume = parseFloat(e.target.value);
-    videoRef.current.volume = newVolume;
+    const video = videoRef.current;
+    if (!video) return;
+    
+    video.volume = newVolume;
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
-  };
+  }, []);
 
-  const handleProgressClick = (e) => {
+  const handleProgressClick = useCallback((e) => {
+    if (!progressBarRef.current) return;
+    
     const rect = progressBarRef.current.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
     const newTime = pos * duration;
     
+    const video = videoRef.current;
+    if (!video) return;
+    
     setBuffering(true);
-    videoRef.current.currentTime = newTime;
-  };
+    video.currentTime = newTime;
+  }, [duration]);
 
-  const skip = (seconds) => {
+  const skip = useCallback((seconds) => {
+    const video = videoRef.current;
+    if (!video) return;
+    
     setBuffering(true);
-    videoRef.current.currentTime += seconds;
-  };
+    video.currentTime += seconds;
+  }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen();
       setIsFullscreen(true);
@@ -278,47 +316,44 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
       document.exitFullscreen();
       setIsFullscreen(false);
     }
-  };
+  }, []);
 
-  const changeQuality = (qualityIndex) => {
-    if (hlsRef.current && videoRef.current) {
-      const wasPlaying = !videoRef.current.paused;
-      const currentTimeBeforeSwitch = videoRef.current.currentTime;
-      
-      // Clear any existing bandwidth monitor
-      if (bandwidthMonitorRef.current) {
-        clearInterval(bandwidthMonitorRef.current);
-        bandwidthMonitorRef.current = null;
-      }
-      
-      if (qualityIndex === -1) {
-        // Enable adaptive bitrate - HLS.js handles everything automatically
-        hlsRef.current.currentLevel = -1;
-        setCurrentQuality('Auto');
-      } else {
-        // Manual quality selection
-        hlsRef.current.currentLevel = qualityIndex;
-        const quality = hlsRef.current.levels[qualityIndex];
-        setCurrentQuality(`${quality.height}p`);
-      }
-      
-      setBuffering(true);
-      
-      // Resume playback after quality switch
-      videoRef.current.currentTime = currentTimeBeforeSwitch;
-      if (wasPlaying) {
-        setTimeout(() => {
-          videoRef.current.play().catch(err => console.log('Resume error:', err));
-          setBuffering(false);
-        }, 100);
-      } else {
-        setBuffering(false);
-      }
+  const changeQuality = useCallback((qualityIndex) => {
+    if (!hlsRef.current || !videoRef.current) return;
+    
+    const hls = hlsRef.current;
+    const video = videoRef.current;
+    const wasPlaying = !video.paused;
+    const currentTimeBeforeSwitch = video.currentTime;
+    
+    if (qualityIndex === -1) {
+      // Enable adaptive bitrate - HLS.js handles everything automatically
+      hls.currentLevel = -1;
+      setCurrentQuality('Auto');
+    } else {
+      // Manual quality selection
+      hls.currentLevel = qualityIndex;
+      const quality = hls.levels[qualityIndex];
+      setCurrentQuality(`${quality.height}p`);
     }
+    
+    setBuffering(true);
+    
+    // Resume playback after quality switch
+    video.currentTime = currentTimeBeforeSwitch;
+    if (wasPlaying) {
+      setTimeout(() => {
+        video.play().catch((err) => console.warn('Resume error:', err.message));
+        setBuffering(false);
+      }, QUALITY_SWITCH_DELAY);
+    } else {
+      setBuffering(false);
+    }
+    
     setShowQualityMenu(false);
-  };
+  }, []);
 
-  const formatTime = (timeInSeconds) => {
+  const formatTime = useCallback((timeInSeconds) => {
     const hours = Math.floor(timeInSeconds / 3600);
     const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const seconds = Math.floor(timeInSeconds % 60);
@@ -327,7 +362,11 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
+
+  // Memoize formatted times
+  const formattedCurrentTime = useMemo(() => formatTime(currentTime), [currentTime, formatTime]);
+  const formattedDuration = useMemo(() => formatTime(duration), [duration, formatTime]);
 
   return (
     <div
@@ -341,7 +380,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
         if (isPlaying) {
           controlsTimeoutRef.current = setTimeout(() => {
             setShowControls(false);
-          }, 500);
+          }, CONTROLS_QUICK_HIDE_DELAY);
         }
       }}
     >
@@ -373,7 +412,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
             <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
             <p className="text-red-400 text-lg mb-2">{error}</p>
             <p className="text-white/60 text-sm mb-4">
-              {streamSource === 'CloudFront' 
+              {STREAM_SOURCE === 'CloudFront' 
                 ? 'Unable to load stream from CloudFront. Please check your connection.'
                 : 'Unable to load video. The stream may not be available.'}
             </p>
@@ -421,7 +460,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
 
       {/* Controls */}
 <AnimatePresence>
-  {showControls && !isLoading && (
+  {showControls && !isLoading && !controlsDisabled && (
     <motion.div
       ref={controlsRef}
       initial={{ opacity: 0, y: 20 }}
@@ -460,7 +499,7 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
 
         {/* Time Display */}
         <span className="text-white text-sm font-medium whitespace-nowrap min-w-[80px] text-right">
-          {formatTime(currentTime)} / {formatTime(duration)}
+          {formattedCurrentTime} / {formattedDuration}
         </span>
       </div>
 
@@ -588,14 +627,19 @@ const HLSVideoPlayer = ({ streamUrl, movieTitle, posterUrl }) => {
     </motion.div>
   )}
 </AnimatePresence>
+
+      {/* Locked Controls Message */}
+      {controlsDisabled && !isLoading && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/20 shadow-2xl">
+          <p className="text-sm text-white/80 text-center font-medium">
+            🔒 Playback controls are locked. Video sync stays automatic until access is granted.
+          </p>
+        </div>
+      )}
     </div>
   );
-};
+});
 
-HLSVideoPlayer.propTypes = {
-  streamUrl: PropTypes.string.isRequired,
-  movieTitle: PropTypes.string.isRequired,
-  posterUrl: PropTypes.string,
-};
+HLSVideoPlayer.displayName = 'HLSVideoPlayer';
 
 export default HLSVideoPlayer;

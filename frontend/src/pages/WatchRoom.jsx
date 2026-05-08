@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Hls from 'hls.js';
+import HLSVideoPlayer from '../components/HLSVideoPlayer';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -57,10 +58,11 @@ const WatchRoom = () => {
   const [pendingNavigationPath, setPendingNavigationPath] = useState('');
   const [leavingRoom, setLeavingRoom] = useState(false);
   const [refreshingParticipants, setRefreshingParticipants] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
-  const videoRef = useRef(null);
+  const videoPlayerRef = useRef(null);
   const hlsRef = useRef(null);
   const isProgrammaticRef = useRef(false);
   const lastSyncEmitRef = useRef(0);
@@ -100,6 +102,9 @@ const WatchRoom = () => {
   const isRoomHost =
     !!normalizeId(currentUserId) && normalizeId(currentUserId) === hostUserId;
   const hasPlaybackControl = canControlPlayback || isRoomHost;
+
+  // Helper to get video element from player ref
+  const getVideoElement = () => videoPlayerRef.current?.video;
 
   /**
    * Apply remote video state with threshold-based syncing
@@ -155,7 +160,7 @@ const WatchRoom = () => {
 
     heartbeatIntervalRef.current = setInterval(() => {
       const socket = socketRef.current;
-      const video = videoRef.current;
+      const video = getVideoElement();
       
       if (!socket || !video || !hasPlaybackControl) return;
       if (isProgrammaticRef.current) return;
@@ -271,68 +276,6 @@ const WatchRoom = () => {
     fetchRoom();
   }, [roomId]);
 
-  // Setup video source (HLS or fallback)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return undefined;
-
-    const folder = roomData?.movie?.videoFolderName;
-    const hlsUrl = folder ? `${CLOUDFRONT_BASE_URL}/${folder}/master.m3u8` : null;
-
-    // Cleanup any previous HLS instance
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    setVideoError('');
-
-    if (!hlsUrl) {
-      video.src = SAMPLE_VIDEO_URL;
-      return undefined;
-    }
-
-    // Use native HLS on Safari
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = hlsUrl;
-      return undefined;
-    }
-
-    // Use Hls.js on other browsers
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        startLevel: -1,
-        autoStartLoad: true,
-      });
-
-      hlsRef.current = hls;
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data?.fatal) {
-          setVideoError('Unable to load selected movie stream. Playing fallback sample.');
-          hls.destroy();
-          hlsRef.current = null;
-          video.src = SAMPLE_VIDEO_URL;
-        }
-      });
-    } else {
-      setVideoError('HLS is not supported in this browser. Playing fallback sample.');
-      video.src = SAMPLE_VIDEO_URL;
-    }
-
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [roomData?.movie?.videoFolderName]);
-
-
   // Socket.IO connection and event handlers
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -399,7 +342,7 @@ const WatchRoom = () => {
       if (payload?.videoState) {
         initialSyncAppliedRef.current = true;
         pendingVideoStateRef.current = payload.videoState;
-        const video = videoRef.current;
+        const video = getVideoElement();
         if (video) {
           if (video.readyState >= 1) {
             applyRemoteVideoState(video, payload.videoState, true); // Force initial sync
@@ -497,7 +440,7 @@ const WatchRoom = () => {
      * IMPROVED: video-play handler with buffering
      */
     socket.on('video-play', async (payload) => {
-      const video = videoRef.current;
+      const video = getVideoElement();
       if (!video) return;
       
       const targetTime = Number(payload?.time);
@@ -530,7 +473,7 @@ const WatchRoom = () => {
      * IMPROVED: video-pause handler
      */
     socket.on('video-pause', (payload) => {
-      const video = videoRef.current;
+      const video = getVideoElement();
       if (!video) return;
       
       const targetTime = Number(payload?.time);
@@ -553,7 +496,7 @@ const WatchRoom = () => {
      * IMPROVED: video-seek handler
      */
     socket.on('video-seek', (payload) => {
-      const video = videoRef.current;
+      const video = getVideoElement();
       if (!video) return;
       
       const targetTime = Number(payload?.time);
@@ -574,7 +517,7 @@ const WatchRoom = () => {
      * IMPROVED: video-heartbeat handler with threshold-based sync
      */
     socket.on('video-heartbeat', (payload) => {
-      const video = videoRef.current;
+      const video = getVideoElement();
       if (!video) return;
 
       const targetTime = Number(payload?.time);
@@ -651,6 +594,21 @@ const WatchRoom = () => {
     console.log('[WATCH ROOM] Users:', activeUsers.map(u => u.nickName || u.name).join(', '));
   }, [activeUsers]);
 
+  // Update video progress for smooth UI
+  useEffect(() => {
+    const video = getVideoElement();
+    if (!video) return;
+
+    const updateProgress = () => {
+      if (video.duration) {
+        setVideoProgress((video.currentTime / video.duration) * 100);
+      }
+    };
+
+    video.addEventListener('timeupdate', updateProgress);
+    return () => video.removeEventListener('timeupdate', updateProgress);
+  }, []);
+
   useEffect(() => {
     const handleAnchorNavigation = (event) => {
       if (intentionalLeaveRef.current) return;
@@ -724,7 +682,7 @@ const WatchRoom = () => {
 
   // Apply initial video state from room data
   useEffect(() => {
-    const video = videoRef.current;
+    const video = getVideoElement();
     const state = roomData?.videoState;
     if (!video || !state) return;
     if (initialSyncAppliedRef.current) return;
@@ -803,7 +761,7 @@ const WatchRoom = () => {
    */
   const emitVideoSync = (eventName) => {
     const socket = socketRef.current;
-    const video = videoRef.current;
+    const video = getVideoElement();
     if (!socket || !video) return;
     if (isProgrammaticRef.current) return;
     if (Date.now() < suppressEmitsUntilRef.current) return;
@@ -920,27 +878,21 @@ const WatchRoom = () => {
             </div>
           )}
 
-          <div className="flex-1 rounded-xl border border-white/10 bg-gradient-to-br from-[#121a2a] to-[#090d16] p-3 sm:p-4 flex items-center justify-center">
-            <div className="w-full h-full rounded-lg overflow-hidden border border-white/10 bg-black/60">
-              <video
-                ref={videoRef}
-                className="w-full h-full object-contain bg-black"
-                controls={hasPlaybackControl}
-                playsInline
-                preload="metadata"
-                onPlay={handleVideoPlay}
-                onPause={handleVideoPause}
-                onSeeked={handleVideoSeeked}
-                poster={roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A' ? roomData.movie.Poster : undefined}
-              >
-                <source src={SAMPLE_VIDEO_URL} type="video/mp4" />
-                Your browser does not support HTML5 video playback.
-              </video>
-            </div>
+          <div className="flex-1 rounded-xl border border-white/10 bg-gradient-to-br from-[#121a2a] to-[#090d16] p-3 sm:p-4 flex items-center justify-center overflow-hidden">
+            <HLSVideoPlayer
+              streamUrl={
+                roomData?.movie?.videoFolderName
+                  ? `${CLOUDFRONT_BASE_URL}/${roomData.movie.videoFolderName}/master.m3u8`
+                  : SAMPLE_VIDEO_URL
+              }
+              movieTitle={roomData?.movie?.Title || roomData?.name || 'Watch Together'}
+              posterUrl={roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A' ? roomData.movie.Poster : undefined}
+              onPlay={handleVideoPlay}
+              onPause={handleVideoPause}
+              onSeeked={handleVideoSeeked}
+              controlsDisabled={!hasPlaybackControl}
+            />
           </div>
-          {!hasPlaybackControl && (
-            <p className="mt-2 text-xs text-white/50 text-center">Playback controls are locked. Video sync stays automatic until access is granted.</p>
-          )}
         </section>
 
         <aside className="md:col-span-4 xl:col-span-3 bg-[#0b0f18] border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col min-h-0 h-[520px] md:h-full">
