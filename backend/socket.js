@@ -17,6 +17,8 @@ function initializeSocket(httpServer) {
     const watchRoomPresence = new Map();
     // Track who can control playback in each watch room: Map<roomId, Set<userId>>
     const watchRoomControlPermissions = new Map();
+    // Track last video state update timestamp per room for latency compensation
+    const watchRoomLastUpdate = new Map();
 
     const hasPlaybackControl = (watchRoomId, userId, hostId) => {
         const key = watchRoomId.toString();
@@ -128,41 +130,79 @@ function initializeSocket(httpServer) {
                 await watchRoom.save();
 
                 const watchSocketRoom = `watch:${watchRoom._id.toString()}`;
-                socket.join(watchSocketRoom);
-                socket.data.joinedWatchRooms.add(watchRoom._id.toString());
-
                 const roomKey = watchRoom._id.toString();
                 const hostId = watchRoom.host.toString();
+                
+                // Initialize presence map if needed
+                if (!watchRoomPresence.has(roomKey)) {
+                    watchRoomPresence.set(roomKey, new Map());
+                }
+
+                // Add user to presence BEFORE joining socket room
+                const roomUsers = watchRoomPresence.get(roomKey);
+                const userPayload = {
+                    id: userId,
+                    name: socket.user.name,
+                    nickName: socket.user.nickName
+                };
+                
+                // Check if user is rejoining
+                const isRejoin = roomUsers.has(userId);
+                roomUsers.set(userId, userPayload);
+                
+                if (isRejoin) {
+                    console.log(`[SOCKET] ${socket.user.nickName} is REJOINING watch room ${roomKey}`);
+                } else {
+                    console.log(`[SOCKET] ${socket.user.nickName} is JOINING watch room ${roomKey} for the first time`);
+                }
+
+                // Initialize control permissions
                 if (!watchRoomControlPermissions.has(roomKey)) {
                     watchRoomControlPermissions.set(roomKey, new Set([hostId]));
                 }
                 const controllers = watchRoomControlPermissions.get(roomKey);
                 controllers.add(hostId);
 
-                if (!watchRoomPresence.has(watchRoom._id.toString())) {
-                    watchRoomPresence.set(watchRoom._id.toString(), new Map());
-                }
+                // Now join the socket room
+                socket.join(watchSocketRoom);
+                socket.data.joinedWatchRooms.add(roomKey);
 
-                const roomUsers = watchRoomPresence.get(watchRoom._id.toString());
-                const userPayload = {
-                    id: userId,
-                    name: socket.user.name,
-                    nickName: socket.user.nickName
-                };
-                roomUsers.set(userId, userPayload);
+                // Get all users for broadcast
+                const allUsers = Array.from(roomUsers.values());
+                
+                console.log(`[SOCKET] ${socket.user.nickName} joined watch room ${roomKey}. Total users: ${allUsers.length}`);
+                console.log('[SOCKET] Current participants:', allUsers.map(u => u.nickName || u.name).join(', '));
 
-                // Send current participants to the joining user first.
-                socket.emit('room-users', {
-                    roomId: watchRoom._id.toString(),
-                    users: Array.from(roomUsers.values())
+                // Use setImmediate to ensure socket.join() completes before emitting
+                setImmediate(() => {
+                    console.log('[SOCKET] ========== EMITTING ROOM-USERS ==========');
+                    console.log('[SOCKET] To user:', socket.user.nickName);
+                    console.log('[SOCKET] Room:', roomKey);
+                    console.log('[SOCKET] Users to send:', JSON.stringify(allUsers, null, 2));
+                    
+                    // Send to the joining user first (guaranteed delivery)
+                    socket.emit('room-users', {
+                        roomId: roomKey,
+                        users: allUsers
+                    });
+                    console.log(`[SOCKET] ✓ Sent room-users to ${socket.user.nickName}:`, allUsers.map(u => u.nickName).join(', '));
+
+                    // Then broadcast to all others in the room
+                    socket.to(watchSocketRoom).emit('room-users', {
+                        roomId: roomKey,
+                        users: allUsers
+                    });
+                    console.log(`[SOCKET] ✓ Broadcasted room-users to others in room`);
+
+                    // Also notify others about the new connection
+                    socket.to(watchSocketRoom).emit('user-connected', {
+                        roomId: watchRoom._id,
+                        user: userPayload
+                    });
+                    console.log('[SOCKET] ========== END EMITTING ==========');
                 });
 
-                // Notify others in room about this user.
-                socket.to(watchSocketRoom).emit('user-connected', {
-                    roomId: watchRoom._id,
-                    user: userPayload
-                });
-
+                // Calculate compensated time for late joiners
                 const baseTime = Number(watchRoom.videoState?.currentTime || 0);
                 const isPlayingNow = !!watchRoom.videoState?.isPlaying;
                 const lastUpdatedAt = watchRoom.videoState?.lastUpdated
@@ -172,14 +212,17 @@ function initializeSocket(httpServer) {
                     ? Math.max(0, (Date.now() - lastUpdatedAt) / 1000)
                     : 0;
 
+                const compensatedTime = baseTime + driftSeconds;
+
                 socket.emit('room-joined', {
                     roomId: watchRoom._id.toString(),
                     inviteCode: watchRoom.inviteCode,
                     videoState: {
-                        currentTime: baseTime + driftSeconds,
+                        currentTime: compensatedTime,
                         isPlaying: isPlayingNow,
                         lastUpdated: watchRoom.videoState?.lastUpdated || new Date(),
-                        updatedBy: watchRoom.videoState?.updatedBy || null
+                        updatedBy: watchRoom.videoState?.updatedBy || null,
+                        serverTimestamp: Date.now() // For latency calculation
                     },
                     permissions: {
                         canControl: controllers.has(userId),
@@ -196,6 +239,82 @@ function initializeSocket(httpServer) {
             } catch (error) {
                 console.error('[SOCKET] Watch room join error:', error.message);
                 socket.emit('error', { message: 'Failed to join watch room' });
+            }
+        });
+
+        /**
+         * Request current room users (manual refresh)
+         */
+        socket.on('request-room-users', async (data = {}, callback) => {
+            const { roomId } = data;
+            
+            console.log(`[SOCKET] ========== REQUEST-ROOM-USERS ==========`);
+            console.log(`[SOCKET] From: ${socket.user.nickName}`);
+            console.log(`[SOCKET] Room ID:`, roomId);
+            
+            if (!roomId) {
+                console.log('[SOCKET] ERROR: No roomId provided');
+                if (typeof callback === 'function') {
+                    callback({ success: false, message: 'roomId is required' });
+                }
+                return;
+            }
+
+            try {
+                let watchRoom = null;
+                if (/^[a-fA-F0-9]{24}$/.test(roomId)) {
+                    watchRoom = await WatchRoom.findById(roomId);
+                }
+                if (!watchRoom) {
+                    watchRoom = await WatchRoom.findOne({ inviteCode: roomId });
+                }
+                if (!watchRoom) {
+                    console.log('[SOCKET] ERROR: Watch room not found');
+                    if (typeof callback === 'function') {
+                        callback({ success: false, message: 'Watch room not found' });
+                    }
+                    return;
+                }
+
+                const watchRoomId = watchRoom._id.toString();
+                const roomUsers = watchRoomPresence.get(watchRoomId);
+
+                console.log('[SOCKET] Presence map exists:', !!roomUsers);
+                console.log('[SOCKET] Presence map size:', roomUsers ? roomUsers.size : 0);
+
+                if (roomUsers && roomUsers.size > 0) {
+                    const allUsers = Array.from(roomUsers.values());
+                    console.log('[SOCKET] Sending users:', JSON.stringify(allUsers, null, 2));
+                    
+                    socket.emit('room-users', {
+                        roomId: watchRoomId,
+                        users: allUsers
+                    });
+                    
+                    console.log(`[SOCKET] ✓ Sent ${allUsers.length} users to ${socket.user.nickName}:`, allUsers.map(u => u.nickName).join(', '));
+                    
+                    if (typeof callback === 'function') {
+                        callback({ success: true, userCount: allUsers.length });
+                    }
+                } else {
+                    console.log('[SOCKET] WARNING: No users in presence map, sending empty array');
+                    socket.emit('room-users', {
+                        roomId: watchRoomId,
+                        users: []
+                    });
+                    
+                    if (typeof callback === 'function') {
+                        callback({ success: true, userCount: 0, warning: 'No users in presence map' });
+                    }
+                }
+                
+                console.log('[SOCKET] ========== END REQUEST-ROOM-USERS ==========');
+            } catch (error) {
+                console.error('[SOCKET] ERROR in request-room-users:', error.message);
+                console.error('[SOCKET] Stack:', error.stack);
+                if (typeof callback === 'function') {
+                    callback({ success: false, message: error.message });
+                }
             }
         });
 
@@ -230,10 +349,24 @@ function initializeSocket(httpServer) {
 
                 const roomUsers = watchRoomPresence.get(watchRoomId);
                 if (roomUsers) {
+                    const hadUser = roomUsers.has(userId);
                     roomUsers.delete(userId);
+                    
+                    console.log(`[SOCKET] ${socket.user.nickName} left watch room ${watchRoomId}. Had user: ${hadUser}, Remaining: ${roomUsers.size}`);
+                    
                     if (roomUsers.size === 0) {
                         watchRoomPresence.delete(watchRoomId);
                         watchRoomControlPermissions.delete(watchRoomId);
+                        watchRoomLastUpdate.delete(watchRoomId);
+                        console.log(`[SOCKET] Watch room ${watchRoomId} is now empty, cleaning up`);
+                    } else {
+                        // Broadcast updated user list to remaining participants
+                        const remainingUsers = Array.from(roomUsers.values());
+                        io.to(watchSocketRoom).emit('room-users', {
+                            roomId: watchRoomId,
+                            users: remainingUsers
+                        });
+                        console.log(`[SOCKET] Broadcasted updated user list to room. Remaining users:`, remainingUsers.map(u => u.nickName || u.name).join(', '));
                     }
                 }
 
@@ -252,6 +385,7 @@ function initializeSocket(httpServer) {
                 console.error('[SOCKET] Watch room leave error:', error.message);
             }
         });
+
 
         /**
          * Send a watch-room chat message
@@ -433,10 +567,10 @@ function initializeSocket(httpServer) {
         });
 
         /**
-         * Watch-room video sync: play
+         * IMPROVED: Watch-room video sync: play with latency compensation
          */
         socket.on('video-play', async (data = {}) => {
-            const { roomId, time = 0 } = data;
+            const { roomId, time = 0, clientTimestamp } = data;
 
             try {
                 if (!roomId) return;
@@ -452,27 +586,43 @@ function initializeSocket(httpServer) {
 
                 if (!hasPlaybackControl(watchRoom._id, userId, watchRoom.host)) return;
 
+                const watchRoomId = watchRoom._id.toString();
+                const serverTimestamp = Date.now();
+                
+                // Prevent race conditions: check if this update is newer than last
+                const lastUpdate = watchRoomLastUpdate.get(watchRoomId) || 0;
+                if (clientTimestamp && clientTimestamp < lastUpdate) {
+                    console.log('[SOCKET] Ignoring stale video-play event');
+                    return;
+                }
+                watchRoomLastUpdate.set(watchRoomId, serverTimestamp);
+
                 watchRoom.videoState.currentTime = Number.isFinite(time) ? time : 0;
                 watchRoom.videoState.isPlaying = true;
-                watchRoom.videoState.lastUpdated = new Date();
+                watchRoom.videoState.lastUpdated = new Date(serverTimestamp);
                 watchRoom.videoState.updatedBy = socket.user._id;
                 await watchRoom.save();
 
+                // Broadcast with buffering hint for smooth playback
                 socket.to(`watch:${watchRoom._id.toString()}`).emit('video-play', {
                     roomId: watchRoom._id.toString(),
                     time: watchRoom.videoState.currentTime,
-                    userId
+                    userId,
+                    serverTimestamp,
+                    bufferDelay: 200 // Hint clients to buffer before playing
                 });
+
+                console.log(`[SOCKET] video-play: room=${watchRoomId}, time=${time.toFixed(2)}s, user=${socket.user.nickName}`);
             } catch (error) {
                 console.error('[SOCKET] video-play error:', error.message);
             }
         });
 
         /**
-         * Watch-room video sync: pause
+         * IMPROVED: Watch-room video sync: pause with latency compensation
          */
         socket.on('video-pause', async (data = {}) => {
-            const { roomId, time = 0 } = data;
+            const { roomId, time = 0, clientTimestamp } = data;
 
             try {
                 if (!roomId) return;
@@ -488,27 +638,41 @@ function initializeSocket(httpServer) {
 
                 if (!hasPlaybackControl(watchRoom._id, userId, watchRoom.host)) return;
 
+                const watchRoomId = watchRoom._id.toString();
+                const serverTimestamp = Date.now();
+                
+                // Prevent race conditions
+                const lastUpdate = watchRoomLastUpdate.get(watchRoomId) || 0;
+                if (clientTimestamp && clientTimestamp < lastUpdate) {
+                    console.log('[SOCKET] Ignoring stale video-pause event');
+                    return;
+                }
+                watchRoomLastUpdate.set(watchRoomId, serverTimestamp);
+
                 watchRoom.videoState.currentTime = Number.isFinite(time) ? time : 0;
                 watchRoom.videoState.isPlaying = false;
-                watchRoom.videoState.lastUpdated = new Date();
+                watchRoom.videoState.lastUpdated = new Date(serverTimestamp);
                 watchRoom.videoState.updatedBy = socket.user._id;
                 await watchRoom.save();
 
                 socket.to(`watch:${watchRoom._id.toString()}`).emit('video-pause', {
                     roomId: watchRoom._id.toString(),
                     time: watchRoom.videoState.currentTime,
-                    userId
+                    userId,
+                    serverTimestamp
                 });
+
+                console.log(`[SOCKET] video-pause: room=${watchRoomId}, time=${time.toFixed(2)}s, user=${socket.user.nickName}`);
             } catch (error) {
                 console.error('[SOCKET] video-pause error:', error.message);
             }
         });
 
         /**
-         * Watch-room video sync: seek
+         * IMPROVED: Watch-room video sync: seek with latency compensation
          */
         socket.on('video-seek', async (data = {}) => {
-            const { roomId, time = 0 } = data;
+            const { roomId, time = 0, clientTimestamp } = data;
 
             try {
                 if (!roomId) return;
@@ -522,25 +686,42 @@ function initializeSocket(httpServer) {
                 }
                 if (!watchRoom || watchRoom.status === 'ended') return;
 
+                if (!hasPlaybackControl(watchRoom._id, userId, watchRoom.host)) return;
+
+                const watchRoomId = watchRoom._id.toString();
+                const serverTimestamp = Date.now();
+                
+                // Prevent race conditions
+                const lastUpdate = watchRoomLastUpdate.get(watchRoomId) || 0;
+                if (clientTimestamp && clientTimestamp < lastUpdate) {
+                    console.log('[SOCKET] Ignoring stale video-seek event');
+                    return;
+                }
+                watchRoomLastUpdate.set(watchRoomId, serverTimestamp);
+
                 watchRoom.videoState.currentTime = Number.isFinite(time) ? time : 0;
-                watchRoom.videoState.lastUpdated = new Date();
+                watchRoom.videoState.lastUpdated = new Date(serverTimestamp);
                 watchRoom.videoState.updatedBy = socket.user._id;
                 await watchRoom.save();
 
                 socket.to(`watch:${watchRoom._id.toString()}`).emit('video-seek', {
                     roomId: watchRoom._id.toString(),
                     time: watchRoom.videoState.currentTime,
-                    userId
+                    userId,
+                    serverTimestamp
                 });
+
+                console.log(`[SOCKET] video-seek: room=${watchRoomId}, time=${time.toFixed(2)}s, user=${socket.user.nickName}`);
             } catch (error) {
                 console.error('[SOCKET] video-seek error:', error.message);
             }
         });
 
         /**
-         * Watch-room video sync: periodic state reconciliation (time + play state)
+         * IMPROVED: Periodic heartbeat sync with threshold-based correction
+         * Only sent every 5-10 seconds by clients with control
          */
-        socket.on('video-sync', async (data = {}) => {
+        socket.on('video-heartbeat', async (data = {}) => {
             const { roomId, time = 0, isPlaying = false } = data;
 
             try {
@@ -555,22 +736,30 @@ function initializeSocket(httpServer) {
                 }
                 if (!watchRoom || watchRoom.status === 'ended') return;
 
+                if (!hasPlaybackControl(watchRoom._id, userId, watchRoom.host)) return;
+
+                const watchRoomId = watchRoom._id.toString();
+
+                // Update state in database
                 watchRoom.videoState.currentTime = Number.isFinite(time) ? time : 0;
                 watchRoom.videoState.isPlaying = !!isPlaying;
                 watchRoom.videoState.lastUpdated = new Date();
                 watchRoom.videoState.updatedBy = socket.user._id;
                 await watchRoom.save();
 
-                socket.to(`watch:${watchRoom._id.toString()}`).emit('video-sync', {
+                // Broadcast heartbeat to other clients (they'll apply threshold logic)
+                socket.to(`watch:${watchRoom._id.toString()}`).emit('video-heartbeat', {
                     roomId: watchRoom._id.toString(),
                     time: watchRoom.videoState.currentTime,
                     isPlaying: watchRoom.videoState.isPlaying,
-                    userId
+                    userId,
+                    serverTimestamp: Date.now()
                 });
             } catch (error) {
-                console.error('[SOCKET] video-sync error:', error.message);
+                console.error('[SOCKET] video-heartbeat error:', error.message);
             }
         });
+
 
         /**
          * Join a chat room
@@ -760,7 +949,7 @@ function initializeSocket(httpServer) {
         socket.on('users:status', (data) => {
             const { userIds } = data;
             const statuses = {};
-            
+
             userIds.forEach(id => {
                 statuses[id] = onlineUsers.has(id);
             });
@@ -779,10 +968,24 @@ function initializeSocket(httpServer) {
                 socket.data.joinedWatchRooms.forEach((watchRoomId) => {
                     const roomUsers = watchRoomPresence.get(watchRoomId);
                     if (roomUsers) {
+                        const hadUser = roomUsers.has(userId);
                         roomUsers.delete(userId);
+                        
+                        console.log(`[SOCKET] ${socket.user.nickName} disconnected from watch room ${watchRoomId}. Had user: ${hadUser}, Remaining: ${roomUsers.size}`);
+                        
                         if (roomUsers.size === 0) {
                             watchRoomPresence.delete(watchRoomId);
                             watchRoomControlPermissions.delete(watchRoomId);
+                            watchRoomLastUpdate.delete(watchRoomId);
+                            console.log(`[SOCKET] Watch room ${watchRoomId} is now empty after disconnect, cleaning up`);
+                        } else {
+                            // Broadcast updated user list to remaining participants
+                            const remainingUsers = Array.from(roomUsers.values());
+                            io.to(`watch:${watchRoomId}`).emit('room-users', {
+                                roomId: watchRoomId,
+                                users: remainingUsers
+                            });
+                            console.log(`[SOCKET] Broadcasted updated user list after disconnect. Remaining:`, remainingUsers.map(u => u.nickName || u.name).join(', '));
                         }
                     }
 
