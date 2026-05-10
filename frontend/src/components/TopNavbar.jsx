@@ -5,15 +5,15 @@ import { useNavigate } from "react-router-dom";
 import MovieService from "../services/movieService";
 import NotificationMenu from "./NotificationMenu";
 
-const TopNavbar = ({ 
-  showBackButton = false, 
-  onFilterChange, 
+const TopNavbar = ({
+  showBackButton = false,
+  onFilterChange,
   onSearchChange,
   onMovieSelect,
-  currentFilter = "All Media" 
+  currentFilter = "All Media"
 }) => {
   const navigate = useNavigate();
-  
+
   const [filterType, setFilterType] = useState(currentFilter);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,20 +29,20 @@ const TopNavbar = ({
   // useEffect to handle outside clicks for filter dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
-    // If the ref exists AND the clicked element is NOT inside the ref container
-    if (filterRef.current && !filterRef.current.contains(event.target)) {
-      setShowFilterDropdown(false);
-    }
-  };
+      // If the ref exists AND the clicked element is NOT inside the ref container
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setShowFilterDropdown(false);
+      }
+    };
 
-  // Add event listener
-  document.addEventListener('mousedown', handleClickOutside);
-  
-  // Cleanup listener on unmount
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
-  };
-}, []);
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup listener on unmount
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const filterOptions = [
     "All Media",
@@ -98,7 +98,8 @@ const TopNavbar = ({
     }
 
     setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {      try {
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
         const results = await MovieService.searchMovies(searchQuery);
         setSearchResults(results.movies || []);
         setShowSearchResults(true);
@@ -162,6 +163,8 @@ const TopNavbar = ({
     setSearchResults([]);
     setShowSearchResults(false);
   };
+  // Get user info from localStorage for profile display
+  const user = JSON.parse(localStorage.getItem("user"));
 
   return (
     <div className="fixed top-0 right-0 left-20 h-20 
@@ -185,50 +188,50 @@ const TopNavbar = ({
         )}
 
         {/* Filter Dropdown */}
-{/* ADD ref={filterRef} TO THE PARENT CONTAINER */}
-      <div className="relative" ref={filterRef}>
-        <button 
-          onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-          className="flex items-center gap-3 px-5 py-2.5 
+        {/* ADD ref={filterRef} TO THE PARENT CONTAINER */}
+        <div className="relative" ref={filterRef}>
+          <button
+            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+            className="flex items-center gap-3 px-5 py-2.5 
             bg-gradient-to-r from-gold/15 to-gold-light/10 
             hover:from-gold/20 hover:to-gold-light/15 
             rounded-xl border border-gold/30 shadow-lg shadow-gold/10 transition-all"
-        >
-          <Film size={20} className="text-gold" />
-          <span className="text-white text-sm font-semibold">{filterType}</span>
-          <ChevronDown size={18} className={`text-gold/60 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
-        </button>
+          >
+            <Film size={20} className="text-gold" />
+            <span className="text-white text-sm font-semibold">{filterType}</span>
+            <ChevronDown size={18} className={`text-gold/60 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+          </button>
 
-        {/* Filter Dropdown Menu */}
-        <AnimatePresence>
-          {showFilterDropdown && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl 
+          {/* Filter Dropdown Menu */}
+          <AnimatePresence>
+            {showFilterDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 mt-2 w-48 bg-black/95 backdrop-blur-xl 
                 border border-gold/30 rounded-xl overflow-hidden shadow-2xl shadow-black/50 z-50"
-            >
-              {filterOptions.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => {
-                    handleFilterSelect(option);
-                    setShowFilterDropdown(false); // Optional: Close on selection too
-                  }}
-                  className={`w-full px-4 py-3 text-left text-sm font-medium transition-all
-                    ${filterType === option 
-                      ? 'bg-gold/20 text-gold' 
-                      : 'text-white/80 hover:bg-white/10 hover:text-white'
-                    }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              >
+                {filterOptions.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => {
+                      handleFilterSelect(option);
+                      setShowFilterDropdown(false); // Optional: Close on selection too
+                    }}
+                    className={`w-full px-4 py-3 text-left text-sm font-medium transition-all
+                    ${filterType === option
+                        ? 'bg-gold/20 text-gold'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                      }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Search Bar */}
         <div className="flex-1 max-w-2xl relative" ref={searchRef}>
@@ -290,7 +293,7 @@ const TopNavbar = ({
                     >
                       {/* Movie Poster */}
                       <div className="w-12 h-16 rounded-lg overflow-hidden bg-white/10 flex-shrink-0">
-                        <img 
+                        <img
                           src={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
                           alt={movie.Title}
                           className="w-full h-full object-cover"
@@ -299,9 +302,9 @@ const TopNavbar = ({
                               e.target.src = '/placeholder-movie.jpg';
                             }
                           }}
-                        />                     
-                        </div>
-                      
+                        />
+                      </div>
+
                       {/* Movie Info */}
                       <div className="flex-1 text-left">
                         <h4 className="text-white font-semibold text-sm truncate">{movie.Title}</h4>
@@ -355,7 +358,23 @@ const TopNavbar = ({
           >
             <div className="w-9 h-9 bg-gradient-to-br from-gold to-gold-light 
             rounded-full flex items-center justify-center shadow-lg shadow-gold/30">
-              <span className="text-black font-bold">{userName.charAt(0)}</span>
+              {
+                user?.profilePicture ? (
+
+                  <img
+                    src={user.profilePicture}
+                    alt="profile"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+
+                ) : (
+
+                  <span className="text-black font-bold">
+                    {userName.charAt(0)}
+                  </span>
+
+                )
+              }
             </div>
 
             <div className="text-left">

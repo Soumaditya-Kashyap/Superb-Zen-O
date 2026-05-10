@@ -77,6 +77,18 @@ app.use(
    require("./routes/youtube")
 );
 
+app.use(
+    "/api/profile",
+    authMiddleware, // Ensure user is authenticated for profile routes
+    require("./routes/profile")
+);
+
+app.use(
+    "/api/user",
+    authMiddleware, require("./routes/setting") // Ensure user is authenticated for setting routes
+    
+);
+
 // Error handling middleware
 app.use(errorHandler);
 

@@ -1,232 +1,415 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Footer from "../components/Footer";
 
 const SettingsPage = () => {
-  const [settings, setSettings] = useState({
-    notifications: true,
-    autoplay: true,
-    darkMode: true,
-  });
 
+  // =====================================================
+  // 🔐 Password Modal State
+  // =====================================================
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // =====================================================
+  // 🔑 Password Data
+  // =====================================================
   const [passwordData, setPasswordData] = useState({
-    oldPassword: "",
+    currentPassword: "",
     newPassword: "",
   });
 
+  // =====================================================
+  // 🔐 JWT Token
+  // =====================================================
   const token = localStorage.getItem("token");
 
-  // 🔥 Load settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/settings", {
+  // =====================================================
+  // 🔐 Change Password Function
+  // =====================================================
+  const handleChangePassword = async () => {
+
+    try {
+
+      // Validation
+      if (
+        !passwordData.currentPassword ||
+        !passwordData.newPassword
+      ) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      // API Request
+      const res = await fetch(
+        "http://localhost:5000/api/user/change-password",
+        {
+          method: "POST",
+
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        });
 
-        const data = await res.json();
-
-        if (data.success) {
-          setSettings(data.data);
+          body: JSON.stringify({
+            currentPassword: passwordData.currentPassword,
+            newPassword: passwordData.newPassword,
+          }),
         }
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    fetchSettings();
-  }, []);
-
-  // 🔥 Update settings
-  const updateSettings = async (updated) => {
-    try {
-      await fetch("http://localhost:5000/api/settings", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(updated),
-      });
-
-      setSettings((prev) => ({ ...prev, ...updated }));
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // 🔔 Toggle handler
-  const toggleSetting = (key) => {
-    const value = !settings[key];
-    updateSettings({ [key]: value });
-  };
-
-  // 🔐 Change password
-  const handleChangePassword = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/settings/password", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(passwordData),
-      });
+      );
 
       const data = await res.json();
 
+      // Success
       if (data.success) {
-        alert("Password updated");
+
+        alert("Password updated successfully");
+
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+        });
+
         setShowPasswordModal(false);
+
       } else {
+
         alert(data.message);
       }
+
     } catch (error) {
-      console.error(error);
+
+      console.log(error);
+
+      alert("Something went wrong");
     }
   };
 
-  // 🚪 Logout all devices
-  const handleLogoutAll = () => {
+  // =====================================================
+  // 🚪 Logout
+  // =====================================================
+  const handleLogout = () => {
+
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
     window.location.href = "/login";
   };
 
-  // 🚨 Delete account
-  const handleDeleteAccount = async () => {
-    if (!window.confirm("Delete account permanently?")) return;
-
-    try {
-      const res = await fetch("http://localhost:5000/api/settings", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("Account deleted");
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-black text-white px-10 py-10">
 
-      {/* Header */}
-      <div className="mb-10 text-center">
-        <h1 className="text-5xl font-bold">Settings</h1>
-        <p className="text-gray-400">Manage your account and preferences</p>
+    <div className="min-h-screen bg-black text-white px-6 md:px-10 py-10">
+
+      {/* =====================================================
+          🌟 Header
+      ===================================================== */}
+      <div className="mb-12 text-center">
+
+        <h1 className="
+          text-5xl md:text-6xl
+          font-bold
+          bg-gradient-to-r
+          from-gold
+          to-yellow-200
+          bg-clip-text
+          text-transparent
+        ">
+          Settings
+        </h1>
+
+        <p className="text-zinc-400 mt-3 text-lg">
+          Manage your account securely
+        </p>
+
       </div>
 
-      <div className="max-w-4xl mx-auto space-y-8">
+      {/* =====================================================
+          🔐 Main Card
+      ===================================================== */}
+      <div className="max-w-3xl mx-auto">
 
-        {/* 🔐 Account */}
-        <div className="bg-zinc-900 p-6 rounded-xl">
-          <h2 className="text-2xl mb-4">🔐 Account</h2>
+        <div className="
+          bg-zinc-900/80
+          backdrop-blur-md
+          border border-zinc-800
+          rounded-3xl
+          p-8
+          shadow-2xl
+        ">
 
-          <button
-            onClick={() => setShowPasswordModal(true)}
-            className="w-full p-3 bg-zinc-800 rounded-lg mb-3"
-          >
-            Change Password
-          </button>
+          {/* Title */}
+          <h2 className="
+            text-3xl
+            font-bold
+            mb-8
+            flex items-center gap-3
+          ">
+            <span>⚙️</span>
+            Account Settings
+          </h2>
 
-          <button className="w-full p-3 bg-zinc-800 rounded-lg mb-3">
-            Manage Subscription
-          </button>
+          {/* =====================================
+              Change Password Card
+          ===================================== */}
+          <div className="
+            bg-zinc-800/60
+            border border-zinc-700
+            rounded-2xl
+            p-6
+            mb-5
+            hover:border-gold/50
+            transition
+          ">
 
-          <button
-            onClick={handleLogoutAll}
-            className="w-full p-3 bg-zinc-800 rounded-lg"
-          >
-            Logout from all devices
-          </button>
-        </div>
+            <div className="
+              flex
+              flex-col md:flex-row
+              md:items-center
+              md:justify-between
+              gap-4
+            ">
 
-        {/* 🔔 Preferences */}
-        <div className="bg-zinc-900 p-6 rounded-xl">
-          <h2 className="text-2xl mb-4">🔔 Preferences</h2>
+              <div>
 
-          {["notifications", "autoplay", "darkMode"].map((key) => (
-            <div key={key} className="flex justify-between mb-3">
-              <span>{key}</span>
+                <h3 className="text-xl font-semibold mb-1">
+                  Change Password
+                </h3>
+
+                <p className="text-zinc-400 text-sm">
+                  Update your account password securely
+                </p>
+
+              </div>
+
               <button
-                onClick={() => toggleSetting(key)}
-                className={`px-4 py-1 rounded ${
-                  settings[key] ? "bg-gold text-black" : "bg-zinc-700"
-                }`}
+                onClick={() => setShowPasswordModal(true)}
+                className="
+                  px-6 py-3
+                  rounded-xl
+                  bg-gold
+                  text-black
+                  font-semibold
+                  hover:scale-105
+                  transition
+                "
               >
-                {settings[key] ? "ON" : "OFF"}
+                Update Password
               </button>
+
             </div>
-          ))}
-        </div>
 
-        {/* 🚨 Danger */}
-        <div className="bg-zinc-900 p-6 rounded-xl border border-red-500/30">
-          <h2 className="text-red-400 mb-4">🚨 Danger Zone</h2>
+          </div>
 
-          <button
-            onClick={handleDeleteAccount}
-            className="w-full p-3 bg-red-600 rounded-lg"
-          >
-            Delete Account
-          </button>
+          {/* =====================================
+              Logout Card
+          ===================================== */}
+          <div className="
+            bg-zinc-800/60
+            border border-red-500/20
+            rounded-2xl
+            p-6
+            hover:border-red-500/40
+            transition
+          ">
+
+            <div className="
+              flex
+              flex-col md:flex-row
+              md:items-center
+              md:justify-between
+              gap-4
+            ">
+
+              <div>
+
+                <h3 className="text-xl font-semibold mb-1 text-red-400">
+                  Logout
+                </h3>
+
+                <p className="text-zinc-400 text-sm">
+                  Logout from your current account
+                </p>
+
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="
+                  px-6 py-3
+                  rounded-xl
+                  bg-red-600
+                  hover:bg-red-700
+                  font-semibold
+                  transition
+                "
+              >
+                Logout
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
 
       </div>
 
-      {/* 🔐 Password Modal */}
+      {/* =====================================================
+          🔐 Password Modal
+      ===================================================== */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
-          <div className="bg-zinc-900 p-6 rounded-xl w-96">
-            <h2 className="text-xl mb-4">Change Password</h2>
 
-            <input
-              type="password"
-              placeholder="Old Password"
-              className="w-full mb-3 p-2 bg-black border"
-              onChange={(e) =>
-                setPasswordData({ ...passwordData, oldPassword: e.target.value })
-              }
-            />
+        <div className="
+          fixed inset-0
+          bg-black/80
+          backdrop-blur-sm
+          flex items-center justify-center
+          z-50
+        ">
 
-            <input
-              type="password"
-              placeholder="New Password"
-              className="w-full mb-3 p-2 bg-black border"
-              onChange={(e) =>
-                setPasswordData({ ...passwordData, newPassword: e.target.value })
-              }
-            />
+          {/* Modal */}
+          <div className="
+            bg-zinc-900
+            border border-zinc-700
+            rounded-3xl
+            p-8
+            w-[90%]
+            max-w-md
+            shadow-2xl
+            animate-fadeIn
+          ">
 
-            <button
-              onClick={handleChangePassword}
-              className="bg-gold text-black px-4 py-2 rounded"
-            >
-              Update
-            </button>
+            {/* Header */}
+            <div className="
+              flex items-center justify-between
+              mb-6
+            ">
 
-            <button
-              onClick={() => setShowPasswordModal(false)}
-              className="ml-3"
-            >
-              Cancel
-            </button>
+              <h2 className="text-2xl font-bold">
+                🔐 Change Password
+              </h2>
+
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="
+                  text-zinc-400
+                  hover:text-white
+                  text-2xl
+                "
+              >
+                ✕
+              </button>
+
+            </div>
+
+            {/* Current Password */}
+            <div className="mb-5">
+
+              <label className="
+                block mb-2
+                text-sm text-zinc-400
+              ">
+                Current Password
+              </label>
+
+              <input
+                type="password"
+                placeholder="Enter current password"
+                value={passwordData.currentPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    currentPassword: e.target.value,
+                  })
+                }
+                className="
+                  w-full
+                  p-4
+                  rounded-xl
+                  bg-black
+                  border border-zinc-700
+                  outline-none
+                  focus:border-gold
+                  transition
+                "
+              />
+
+            </div>
+
+            {/* New Password */}
+            <div className="mb-7">
+
+              <label className="
+                block mb-2
+                text-sm text-zinc-400
+              ">
+                New Password
+              </label>
+
+              <input
+                type="password"
+                placeholder="Enter new password"
+                value={passwordData.newPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    newPassword: e.target.value,
+                  })
+                }
+                className="
+                  w-full
+                  p-4
+                  rounded-xl
+                  bg-black
+                  border border-zinc-700
+                  outline-none
+                  focus:border-gold
+                  transition
+                "
+              />
+
+            </div>
+
+            {/* Buttons */}
+            <div className="
+              flex justify-end gap-3
+            ">
+
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="
+                  px-5 py-3
+                  rounded-xl
+                  bg-zinc-700
+                  hover:bg-zinc-600
+                  transition
+                "
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleChangePassword}
+                className="
+                  px-5 py-3
+                  rounded-xl
+                  bg-gold
+                  text-black
+                  font-semibold
+                  hover:scale-105
+                  transition
+                "
+              >
+                Update Password
+              </button>
+
+            </div>
+
           </div>
+
         </div>
       )}
 
+      {/* Footer */}
       <Footer />
+
     </div>
   );
 };
