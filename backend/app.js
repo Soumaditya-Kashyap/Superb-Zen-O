@@ -70,6 +70,13 @@ app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/support', require('./routes/supportRoutes'));
 
+
+
+app.use(
+   "/api/youtube",
+   require("./routes/youtube")
+);
+
 // Error handling middleware
 app.use(errorHandler);
 

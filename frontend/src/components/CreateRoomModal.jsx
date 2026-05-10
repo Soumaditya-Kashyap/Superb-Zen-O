@@ -19,7 +19,7 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
+const CreateRoomModal = ({ isOpen, onClose, onRoomCreated,youtubeMovie }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -69,7 +69,28 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated }) => {
       const data = await response.json();
       
       if (data.success) {
-        setMovies(data.movies);
+        // setMovies(data.movies); 
+      
+          //by raki
+         let finalMovies = data.movies || [];
+          // =====================================
+           // ADD CURRENT YOUTUBE VIDEO
+           // =====================================
+
+         if (youtubeMovie) {
+
+         finalMovies = [
+
+         youtubeMovie,
+
+         ...finalMovies
+
+         ];
+
+            }
+          setMovies(finalMovies);
+
+
       }
     } catch (err) {
       console.error('Failed to fetch movies:', err);
