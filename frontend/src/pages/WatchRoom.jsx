@@ -115,7 +115,7 @@ const WatchRoom = () => {
   //   }
   // }, []);
 
-  
+
   const [currentUser, setCurrentUser] =
     useState(
       JSON.parse(
@@ -1001,686 +1001,229 @@ const WatchRoom = () => {
      ========================================================= */
 
   return (
-    <div
-      className="
-      min-h-screen
-      bg-[#05070d]
-      text-white
-      p-3
-      overflow-hidden
-    "
-    >
-
-      {/* =====================================================
-        MAIN CONTAINER
+   <div className="min-h-screen bg-[#05070d] text-white p-3 overflow-hidden">
+  {/* =====================================================
+      MAIN CONTAINER
+  ===================================================== */}
+  <div className="h-[calc(100vh-24px)] flex flex-col gap-3">
+    
+    {/* =====================================================
+        TOP AREA: VIDEO + PARTICIPANTS
     ===================================================== */}
-      <div
-        className="
-        h-[calc(100vh-24px)]
-        flex flex-col
-        gap-3
-      "
-      >
-
-        {/* =====================================================
-          TOP AREA
-          VIDEO + PARTICIPANTS
+    <div className="flex-1 flex gap-3 min-h-0">
+      
+      {/* =====================================================
+          VIDEO + CHAT SECTION
       ===================================================== */}
-        <div
-          className="
-          flex-1
-          grid
-          grid-cols-12
-          gap-3
-          min-h-0
-        "
-        >
-
-          {/* =====================================================
+      <div className="flex-1 flex flex-col gap-3 min-w-0">
+        
+        {/* =====================================================
             VIDEO SECTION
-            Increased Width
         ===================================================== */}
-          <section
-            className="
-            col-span-12
-            lg:col-span-10
-            relative
-            rounded-3xl
-            overflow-hidden
-            border border-white/10
-            bg-black
-          "
+        <section className="flex-1 relative rounded-3xl overflow-hidden border border-white/10 bg-black min-h-0">
+          
+          {/* VIDEO */}
+          <video
+            ref={videoRef}
+            className="w-full h-full object-cover bg-black"
+            controls={hasPlaybackControl}
+            playsInline
+            preload="metadata"
+            onPlay={handleVideoPlay}
+            onPause={handleVideoPause}
+            onSeeked={handleVideoSeeked}
+            poster={
+              roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A'
+                ? roomData.movie.Poster
+                : undefined
+            }
           >
-
-            {/* =====================================================
-              VIDEO PLAYER
-          ===================================================== */}
-            <video
-              ref={videoRef}
-              className="
-              w-full
-              h-full
-              object-cover
-              bg-black
-            "
-              controls={hasPlaybackControl}
-              playsInline
-              preload="metadata"
-              onPlay={handleVideoPlay}
-              onPause={handleVideoPause}
-              onSeeked={handleVideoSeeked}
-              poster={
-                roomData?.movie?.Poster &&
-                  roomData.movie.Poster !== 'N/A'
-                  ? roomData.movie.Poster
-                  : undefined
-              }
-            >
-              <source
-                src={SAMPLE_VIDEO_URL}
-                type="video/mp4"
-              />
-            </video>
-
-            {/* =====================================================
-              TOP VIDEO OVERLAY
-              TITLE + ROOM CODE + LEAVE BUTTON
-          ===================================================== */}
-            <div
-              className="
-              absolute
-              top-0
-              left-0
-              right-0
-              z-40
-              flex items-center justify-between
-              px-6 py-5
-              bg-gradient-to-b
-              from-black/90
-              to-transparent
-            "
-            >
-
-              {/* LEFT */}
-              <div>
-
-                {/* TITLE */}
-                <h1
-                  className="
-                  text-2xl
-                  font-bold
-                "
-                >
-                  Watch Room
-                </h1>
-
-                {/* ROOM CODE */}
-                <p
-                  className="
-                  text-sm
-                  text-white/60
-                  mt-1
-                "
-                >
-                  Watch Party{' '}
-                  <span className="text-gold font-semibold">
-                    {roomData?.roomCode ||
-                      roomData?.code ||
-                      roomId}
-                  </span>
-                </p>
-              </div>
-
-              {/* RIGHT */}
-              <button
-                onClick={() =>
-                  openLeaveConfirmation(
-                    '/watch-together'
-                  )
-                }
-                className="
-                px-4 py-2
-                rounded-xl
-                border border-red-500/30
-                bg-red-500/10
-                text-red-300
-                hover:bg-red-500/20
-                transition-all
-              "
-              >
-                Leave
-              </button>
-            </div>
-
-            {/* =====================================================
-              FLOATING CHAT MESSAGES
-              GOOGLE MEET STYLE
-          ===================================================== */}
-            <div
-              className="
-              absolute
-              left-5
-              bottom-5
-              z-40
-              flex flex-col gap-3
-              pointer-events-none
-            "
-            >
-              <AnimatePresence>
-                {floatingMessages.map((msg) => (
-                  <motion.div
-                    key={msg.id}
-
-                    /* ENTER */
-                    initial={{
-                      opacity: 0,
-                      y: 100,
-                      scale: 0.8,
-                    }}
-
-                    /* ACTIVE */
-                    animate={{
-                      opacity: 1,
-                      y: -180,
-                      scale: 1,
-                    }}
-
-                    /* EXIT */
-                    exit={{
-                      opacity: 0,
-                      y: -260,
-                    }}
-
-                    transition={{
-                      duration: 6,
-                      ease: 'easeOut',
-                    }}
-
-                    className="
-                    max-w-sm
-                    rounded-2xl
-                    border border-white/10
-                    bg-black/30
-                    backdrop-blur-2xl
-                    px-4 py-3
-                    shadow-2xl
-                  "
-                  >
-
-                    {/* USER */}
-                    <p
-                      className="
-                      text-gold
-                      text-xs
-                      font-bold
-                      mb-1
-                    "
-                    >
-                      {msg.sender}
-                    </p>
-
-                    {/* MESSAGE */}
-                    <p
-                      className="
-                      text-white
-                      text-sm
-                      break-words
-                    "
-                    >
-                      {msg.content}
-                    </p>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-
-          </section>
+            <source src={SAMPLE_VIDEO_URL} type="video/mp4" />
+          </video>
 
           {/* =====================================================
-            PARTICIPANTS SIDEBAR
-            FULLSCREEN HOVER SUPPORT
-        ===================================================== */}
-          <AnimatePresence>
-            {showParticipantsSidebar && (
-              <motion.aside
+              TOP OVERLAY
+          ===================================================== */}
+          <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/90 to-transparent">
+            {/* LEFT */}
+            <div>
+              <h1 className="text-2xl font-bold">Watch Room</h1>
+              <p className="text-sm text-white/60 mt-1">
+                Watch Party{" "}
+                <span className="text-gold font-semibold">
+                  {roomData?.roomCode || roomData?.code || roomId}
+                </span>
+              </p>
+            </div>
 
-                /* SLIDE IN */
-                initial={{ x: 320 }}
+            {/* LEAVE BUTTON */}
+            <button
+              onClick={() => openLeaveConfirmation('/watch-together')}
+              className="px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-all"
+            >
+              Leave
+            </button>
+          </div>
 
-                animate={{ x: 0 }}
-
-                exit={{ x: 320 }}
-
-                transition={{
-                  duration: 0.3,
-                }}
-
-                className="
-                col-span-12
-                lg:col-span-2
-                rounded-3xl
-                border border-white/10
-                bg-black/30
-                backdrop-blur-2xl
-                p-4
-                overflow-y-auto
-              "
-              >
-
-                {/* =====================================================
-                  PARTICIPANTS HEADER
-              ===================================================== */}
-                <div
-                  className="
-                  flex items-center justify-between
-                  mb-5
-                "
+          {/* =====================================================
+              FLOATING CHAT
+          ===================================================== */}
+          <div className="absolute left-5 bottom-5 z-40 flex flex-col gap-3 pointer-events-none">
+            <AnimatePresence>
+              {floatingMessages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 100, scale: 0.8 }}
+                  animate={{ opacity: 1, y: -180, scale: 1 }}
+                  exit={{ opacity: 0, y: -260 }}
+                  transition={{ duration: 6, ease: 'easeOut' }}
+                  className="max-w-sm rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3 shadow-2xl"
                 >
-
-                  <h2
-                    className="
-                    text-lg
-                    font-bold
-                  "
-                  >
-                    Participants
-                  </h2>
-
-                  <span
-                    className="
-                    text-xs
-                    text-white/50
-                  "
-                  >
-                    {activeUsers.length} online
-                  </span>
-                </div>
-
-                {/* =====================================================
-                  PARTICIPANTS LIST
-                  ONE CARD PER ROW
-              ===================================================== */}
-                <div
-                  className="
-    flex flex-col
-    gap-4
-  "
-                >
-                  {activeUsers.map((participant, index) => (
-
-                    <div
-                      key={
-                        participant.id ||
-                        participant._id ||
-                        index
-                      }
-
-                      className="
-        aspect-square
-        rounded-2xl
-        border border-white/10
-        bg-white/5
-        flex flex-col
-        items-center justify-center
-        p-3
-      "
-                    >
-
-                      {/* =====================================
-          AVATAR
-      ===================================== */}
-                     {/* =====================================
-    AVATAR
-===================================== */}
-<div
-  className="
-    w-16 h-16
-    rounded-full
-    overflow-hidden
-    bg-[#1a1f2e]
-    flex
-    items-center
-    justify-center
-    mb-3
-    border border-white/10
-    shrink-0
-  "
->
-
-  {/* =====================================
-      CURRENT USER PROFILE IMAGE
-  ===================================== */}
-  {isCurrentUser(participant) &&
-  currentUser?.profilePicture ? (
-
-    <img
-      src={currentUser.profilePicture}
-      alt="Profile"
-      className="
-        w-full
-        h-full
-        object-cover
-      "
-    />
-
-  ) : participant?.profilePicture ? (
-
-    /* =====================================
-        OTHER USER PROFILE IMAGE
-    ===================================== */
-    <img
-      src={participant.profilePicture}
-      alt="Profile"
-      className="
-        w-full
-        h-full
-        object-cover
-      "
-    />
-
-  ) : (
-
-    /* =====================================
-        DEFAULT USER ICON
-    ===================================== */
-    <div
-      className="
-        w-full
-        h-full
-        bg-gradient-to-br
-        from-gold
-        to-yellow-500
-        flex
-        items-center
-        justify-center
-      "
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="
-          w-8 h-8
-          text-black
-        "
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zm-9 13.5a7.5 7.5 0 1115 0"
-        />
-      </svg>
-    </div>
-
-  )}
-</div>
-
-                      {/* =====================================
-          USER NAME
-      ===================================== */}
-                      <p
-                        className="
-          text-sm
-          text-white
-          text-center
-          font-medium
-          line-clamp-2
-        "
-                      >
-                        {participant.nickName ||
-                          participant.name}
-
-                        {isCurrentUser(participant)
-                          ? ' (You)'
-                          : ''}
-                      </p>
-
-                      {/* =====================================
-          ONLINE STATUS
-      ===================================== */}
-                      <p
-                        className="
-          text-xs
-          text-green-400
-          mt-1
-        "
-                      >
-                        Online
-                      </p>
-
-                      {/* =====================================
-          PLAYBACK CONTROL
-      ===================================== */}
-                      {canUserControlPlayback(participant) && (
-                        <p
-                          className="
-            text-[11px]
-            text-gold
-            mt-2
-            text-center
-          "
-                        >
-                          Playback Control
-                        </p>
-                      )}
-
-                      {/* =====================================
-          HOST ACTIONS
-      ===================================== */}
-                      {isRoomHost &&
-                        !isCurrentUser(participant) && (
-
-                          <button
-                            type="button"
-
-                            onClick={() => {
-
-                              const targetId =
-                                participant.id ||
-                                participant._id;
-
-                              if (
-                                canUserControlPlayback(
-                                  participant
-                                )
-                              ) {
-
-                                handleRevokeControl(
-                                  targetId
-                                );
-
-                              } else {
-
-                                handleGrantControl(
-                                  targetId
-                                );
-                              }
-                            }}
-
-                            className="
-              mt-3
-              px-3 py-1.5
-              rounded-lg
-              bg-gold/10
-              border border-gold/20
-              text-gold
-              text-xs
-              hover:bg-gold/20
-              transition-all
-            "
-                          >
-                            {canUserControlPlayback(
-                              participant
-                            )
-                              ? 'Revoke'
-                              : 'Grant'}
-                          </button>
-                        )}
-                    </div>
-                  ))}
-                </div>
-              </motion.aside>
-            )}
-          </AnimatePresence>
-
-        </div>
+                  <p className="text-gold text-xs font-bold mb-1">
+                    {msg.sender}
+                  </p>
+                  <p className="text-white text-sm break-words">
+                    {msg.content}
+                  </p>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </section>
 
         {/* =====================================================
-          MESSAGE INPUT
-          ALWAYS BELOW VIDEO
-          EVEN IN FULLSCREEN
-      ===================================================== */}
-        <div
-          className="
-          rounded-3xl
-          border border-white/10
-          bg-black/30
-          backdrop-blur-2xl
-          px-5 py-4
-        "
-        >
-
-          <div
-            className="
-            flex items-center gap-3
-          "
-          >
-
+            COMPACT CHAT BOX
+        ===================================================== */}
+        <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-3 py-2">
+          <div className="flex items-center gap-2">
             {/* INPUT */}
             <input
               type="text"
               placeholder="Type a message..."
               value={chatInput}
-              onChange={(e) =>
-                setChatInput(e.target.value)
-              }
+              onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleChatKeyDown}
-
-              className="
-              flex-1
-              bg-transparent
-              outline-none
-              text-white
-              placeholder:text-white/40
-            "
+              className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-white/40"
             />
 
             {/* SEND BUTTON */}
             <button
               onClick={handleSendMessage}
-
-              disabled={
-                !chatInput.trim() ||
-                chatSending
-              }
-
-              className="
-              px-6 py-2.5
-              rounded-xl
-              bg-gold
-              text-black
-              font-semibold
-              hover:bg-gold-light
-              transition
-            "
+              disabled={!chatInput.trim() || chatSending}
+              className="px-4 py-1.5 rounded-xl bg-gold text-black text-sm font-semibold hover:bg-gold-light transition"
             >
               Send
             </button>
           </div>
         </div>
-
       </div>
 
       {/* =====================================================
-        LEAVE MODAL
-    ===================================================== */}
-      {showLeaveConfirmModal && (
-        <div
-          className="
-          fixed inset-0
-          z-[1200]
-          bg-black/70
-          backdrop-blur-sm
-          flex items-center justify-center
-          p-4
-        "
-        >
-
-          <div
-            className="
-            w-full max-w-md
-            rounded-3xl
-            border border-red-500/20
-            bg-[#101625]
-            p-6
-          "
+          PARTICIPANTS SIDEBAR
+      ===================================================== */}
+      <AnimatePresence>
+        {showParticipantsSidebar && (
+          <motion.aside
+            initial={{ x: 320 }}
+            animate={{ x: 0 }}
+            exit={{ x: 320 }}
+            transition={{ duration: 0.3 }}
+            className="w-[290px] rounded-3xl border border-white/10 bg-black/30 backdrop-blur-2xl p-4 overflow-y-auto shrink-0"
           >
-
-            {/* TITLE */}
-            <h3
-              className="
-              text-xl
-              font-bold
-            "
-            >
-              Leave Watch Room?
-            </h3>
-
-            {/* DESCRIPTION */}
-            <p
-              className="
-              mt-2
-              text-sm
-              text-white/70
-            "
-            >
-              Are you sure you want
-              to leave this room?
-            </p>
-
-            {/* ACTIONS */}
-            <div
-              className="
-              mt-6
-              flex justify-end gap-3
-            "
-            >
-
-              {/* CANCEL */}
-              <button
-                onClick={cancelLeave}
-
-                className="
-                px-4 py-2
-                rounded-xl
-                border border-white/10
-                hover:bg-white/10
-              "
-              >
-                Stay
-              </button>
-
-              {/* CONFIRM */}
-              <button
-                onClick={confirmLeave}
-
-                className="
-                px-4 py-2
-                rounded-xl
-                bg-red-500
-                hover:bg-red-600
-              "
-              >
-                Leave
-              </button>
-
+            {/* HEADER */}
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">Participants</h2>
+              <span className="text-xs text-white/50">
+                {activeUsers.length} online
+              </span>
             </div>
-          </div>
-        </div>
-      )}
+
+            {/* PARTICIPANTS */}
+            <div className="flex flex-col gap-4">
+              {activeUsers.map((participant, index) => (
+                <div
+                  key={participant.id || participant._id || index}
+                  className="rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-4 min-h-[220px]"
+                >
+                  {/* AVATAR */}
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-3 border border-white/10 shrink-0">
+                    {isCurrentUser(participant) && currentUser?.profilePicture ? (
+                      <img
+                        src={currentUser.profilePicture}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : participant?.profilePicture ? (
+                      <img
+                        src={participant.profilePicture}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gold to-yellow-500" />
+                    )}
+                  </div>
+
+                  {/* NAME */}
+                  <p className="text-sm text-white text-center font-medium line-clamp-2">
+                    {participant.nickName || participant.name}
+                    {isCurrentUser(participant) ? ' (You)' : ''}
+                  </p>
+
+                  {/* STATUS */}
+                  <p className="text-xs text-green-400 mt-1">Online</p>
+
+                  {/* CONTROL */}
+                  {canUserControlPlayback(participant) && (
+                    <p className="text-[11px] text-gold mt-2 text-center">
+                      Playback Control
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
+  </div>
+
+  {/* =====================================================
+      LEAVE MODAL
+  ===================================================== */}
+  {showLeaveConfirmModal && (
+    <div className="fixed inset-0 z-[1200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-3xl border border-red-500/20 bg-[#101625] p-6">
+        {/* TITLE */}
+        <h3 className="text-xl font-bold">Leave Watch Room?</h3>
+        
+        {/* DESCRIPTION */}
+        <p className="mt-2 text-sm text-white/70">
+          Are you sure you want to leave this room?
+        </p>
+
+        {/* ACTIONS */}
+        <div className="mt-6 flex justify-end gap-3">
+          {/* CANCEL */}
+          <button
+            onClick={cancelLeave}
+            className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/10"
+          >
+            Stay
+          </button>
+
+          {/* CONFIRM */}
+          <button
+            onClick={confirmLeave}
+            className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600"
+          >
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
   );
 };
 
