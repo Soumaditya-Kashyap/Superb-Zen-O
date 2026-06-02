@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Hls from 'hls.js';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, MicOff, Video, VideoOff, Phone, PhoneOff } from 'lucide-react';
+import HLSVideoPlayer from '../components/HLSVideoPlayer';
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
@@ -47,6 +50,16 @@ const WatchRoom = () => {
   const [pendingNavigationPath, setPendingNavigationPath] = useState('');
   const [leavingRoom, setLeavingRoom] = useState(false);
   const [refreshingParticipants, setRefreshingParticipants] = useState(false);
+
+  // WebRTC call states
+  const [inCall, setInCall] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isCameraOff, setIsCameraOff] = useState(true);
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStreams, setRemoteStreams] = useState({});
+
+  const peerConnectionsRef = useRef(new Map());
+  const localStreamRef = useRef(null);
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -272,7 +285,7 @@ const WatchRoom = () => {
 
     heartbeatIntervalRef.current = setInterval(() => {
       const socket = socketRef.current;
-      const video = videoRef.current;
+      const video = videoRef.current?.video;
       
       if (!socket || !video || !hasPlaybackControl) return;
       if (isProgrammaticRef.current) return;
@@ -307,6 +320,7 @@ const WatchRoom = () => {
       socketRef.current;
 
     stopHeartbeat();
+    cleanupAllConnections();
 
     if (socket) {
       socket.emit(
@@ -325,6 +339,193 @@ const WatchRoom = () => {
       socket.disconnect();
     }
   };
+
+  const cleanupAllConnections = () => {
+    peerConnectionsRef.current.forEach((pc) => {
+      pc.close();
+    });
+    peerConnectionsRef.current.clear();
+    setRemoteStreams({});
+    
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+  };
+
+  const createPeerConnection = (peerId, isInitiator) => {
+    if (peerConnectionsRef.current.has(peerId)) {
+      peerConnectionsRef.current.get(peerId).close();
+      peerConnectionsRef.current.delete(peerId);
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    // Add local tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current) {
+        socketRef.current.emit('webrtc:signal', {
+          targetUserId: peerId,
+          signal: { type: 'candidate', candidate: event.candidate }
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      console.log(`[WEBRTC] Received track from ${peerId}`);
+      if (event.streams && event.streams[0]) {
+        setRemoteStreams(prev => ({
+          ...prev,
+          [peerId]: event.streams[0]
+        }));
+      }
+    };
+
+    peerConnectionsRef.current.set(peerId, pc);
+
+    if (isInitiator) {
+      pc.onnegotiationneeded = async () => {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current.emit('webrtc:signal', {
+            targetUserId: peerId,
+            signal: pc.localDescription
+          });
+        } catch (err) {
+          console.error('[WEBRTC] Offer creation error:', err);
+        }
+      };
+    }
+
+    return pc;
+  };
+
+  const joinVideoCall = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      setInCall(true);
+      
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) audioTrack.enabled = !isMuted;
+      
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) videoTrack.enabled = !isCameraOff;
+
+      if (socketRef.current) {
+        socketRef.current.emit('call:state-change', {
+          roomId: resolvedRoomId || roomId,
+          inCall: true,
+          isMuted,
+          isCameraOff
+        });
+      }
+    } catch (err) {
+      console.error('[WEBRTC] Media device access failed:', err);
+      alert('Unable to access camera and microphone. Please check permissions.');
+    }
+  };
+
+  const leaveVideoCall = () => {
+    setInCall(false);
+    cleanupAllConnections();
+    if (socketRef.current) {
+      socketRef.current.emit('call:state-change', {
+        roomId: resolvedRoomId || roomId,
+        inCall: false,
+        isMuted: true,
+        isCameraOff: true
+      });
+    }
+  };
+
+  const toggleMute = () => {
+    const nextMute = !isMuted;
+    setIsMuted(nextMute);
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) audioTrack.enabled = !nextMute;
+    }
+    if (socketRef.current) {
+      socketRef.current.emit('call:state-change', {
+        roomId: resolvedRoomId || roomId,
+        inCall: true,
+        isMuted: nextMute,
+        isCameraOff
+      });
+    }
+  };
+
+  const toggleCamera = () => {
+    const nextCameraOff = !isCameraOff;
+    setIsCameraOff(nextCameraOff);
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) videoTrack.enabled = !nextCameraOff;
+    }
+    if (socketRef.current) {
+      socketRef.current.emit('call:state-change', {
+        roomId: resolvedRoomId || roomId,
+        inCall: true,
+        isMuted,
+        isCameraOff: nextCameraOff
+      });
+    }
+  };
+
+  // Peer Connection Synchronizer
+  useEffect(() => {
+    if (!inCall) {
+      return;
+    }
+
+    activeUsers.forEach(user => {
+      const peerId = normalizeId(user.id || user._id);
+      if (peerId === normalizeId(currentUserId)) return;
+      if (!user.inCall) return;
+
+      const pc = peerConnectionsRef.current.get(peerId);
+      if (!pc) {
+        const isInitiator = normalizeId(currentUserId) < peerId;
+        console.log(`[WEBRTC] Establishing connection to ${user.nickName || user.name}. Initiator: ${isInitiator}`);
+        createPeerConnection(peerId, isInitiator);
+      }
+    });
+
+    const activeCallUserIds = new Set(
+      activeUsers.filter(u => u.inCall).map(u => normalizeId(u.id || u._id))
+    );
+    peerConnectionsRef.current.forEach((pc, peerId) => {
+      if (!activeCallUserIds.has(peerId)) {
+        console.log(`[WEBRTC] Closing connection with ${peerId} (left call/room)`);
+        pc.close();
+        peerConnectionsRef.current.delete(peerId);
+        setRemoteStreams(prev => {
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+      }
+    });
+  }, [inCall, activeUsers]);
 
   const openLeaveConfirmation = (
     targetPath =
@@ -408,7 +609,7 @@ const WatchRoom = () => {
 
   // Setup video source (HLS or fallback)
   useEffect(() => {
-    const video = videoRef.current;
+    const video = videoRef.current?.video;
     if (!video) return undefined;
 
     const folder = roomData?.movie?.videoFolderName;
@@ -558,7 +759,7 @@ const WatchRoom = () => {
       if (payload?.videoState) {
         initialSyncAppliedRef.current = true;
         pendingVideoStateRef.current = payload.videoState;
-        const video = videoRef.current;
+        const video = videoRef.current?.video;
         if (video) {
           if (video.readyState >= 1) {
             applyRemoteVideoState(video, payload.videoState, true); // Force initial sync
@@ -638,31 +839,18 @@ const WatchRoom = () => {
      * IMPROVED: video-play handler with buffering
      */
     socket.on('video-play', async (payload) => {
-      const video = videoRef.current;
+      const video = videoRef.current?.video;
       if (!video) return;
       
       const targetTime = Number(payload?.time);
       const bufferDelay = payload?.bufferDelay || BUFFER_DELAY;
 
-        isProgrammaticRef.current =
-          true;
+      isProgrammaticRef.current = true;
+      suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
-        suppressEmitsUntilRef.current =
-          Date.now() +
-          SUPPRESS_EMIT_DURATION;
-
-        if (
-          Number.isFinite(
-            targetTime
-          ) &&
-          Math.abs(
-            video.currentTime -
-            targetTime
-          ) > 0.6
-        ) {
-          video.currentTime =
-            targetTime;
-        }
+      if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.6) {
+        video.currentTime = targetTime;
+      }
 
       // Buffer before playing for smooth sync
       setTimeout(async () => {
@@ -683,7 +871,7 @@ const WatchRoom = () => {
      * IMPROVED: video-pause handler
      */
     socket.on('video-pause', (payload) => {
-      const video = videoRef.current;
+      const video = videoRef.current?.video;
       if (!video) return;
       
       const targetTime = Number(payload?.time);
@@ -706,47 +894,83 @@ const WatchRoom = () => {
      * IMPROVED: video-seek handler
      */
     socket.on('video-seek', (payload) => {
-      const video = videoRef.current;
+      const video = videoRef.current?.video;
       if (!video) return;
       
       const targetTime = Number(payload?.time);
       if (!Number.isFinite(targetTime)) return;
 
-        video.currentTime =
-          payload?.time;
+      isProgrammaticRef.current = true;
+      suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
-        video.pause();
+      video.currentTime = targetTime;
+      video.pause();
 
-        setTimeout(() => {
-          isProgrammaticRef.current =
-            false;
-        }, PROGRAMMATIC_FLAG_DURATION);
-      }
-    );
+      setTimeout(() => {
+        isProgrammaticRef.current = false;
+      }, PROGRAMMATIC_FLAG_DURATION);
+    });
 
     /**
      * IMPROVED: video-heartbeat handler with threshold-based sync
      */
     socket.on('video-heartbeat', (payload) => {
-      const video = videoRef.current;
+      const video = videoRef.current?.video;
       if (!video) return;
 
-        isProgrammaticRef.current =
-          true;
+      const targetTime = Number(payload?.time || 0);
+      const isPlayingNow = !!payload?.isPlaying;
+      const currentTime = video.currentTime;
+      const drift = Math.abs(currentTime - targetTime);
 
-        video.currentTime =
-          payload?.time;
-
+      if (drift > SYNC_THRESHOLD) {
+        console.log(`[SYNC] Heartbeat corrected: local=${currentTime.toFixed(2)}s, target=${targetTime.toFixed(2)}s (drift=${drift.toFixed(2)}s)`);
+        isProgrammaticRef.current = true;
+        video.currentTime = targetTime;
         setTimeout(() => {
-          isProgrammaticRef.current =
-            false;
+          isProgrammaticRef.current = false;
         }, PROGRAMMATIC_FLAG_DURATION);
       }
-    );
+
+      if (isPlayingNow && video.paused) {
+        video.play().catch(() => {});
+      } else if (!isPlayingNow && !video.paused) {
+        video.pause();
+      }
+    });
+
+    socket.on('webrtc:signal', async (payload) => {
+      const { senderUserId, signal } = payload;
+      let pc = peerConnectionsRef.current.get(senderUserId);
+      try {
+        if (signal.type === 'offer') {
+          if (!pc) {
+            pc = createPeerConnection(senderUserId, false);
+          }
+          await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('webrtc:signal', {
+            targetUserId: senderUserId,
+            signal: pc.localDescription
+          });
+        } else if (signal.type === 'answer') {
+          if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          }
+        } else if (signal.type === 'candidate') {
+          if (pc && signal.candidate) {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          }
+        }
+      } catch (err) {
+        console.error('[WEBRTC] Signaling error:', err);
+      }
+    });
 
     return () => {
       stopHeartbeat();
-
+      cleanupAllConnections();
       socket.disconnect();
     };
   }, [roomId]);
@@ -843,7 +1067,7 @@ const WatchRoom = () => {
 
   // Apply initial video state from room data
   useEffect(() => {
-    const video = videoRef.current;
+    const video = videoRef.current?.video;
     const state = roomData?.videoState;
     if (!video || !state) return;
     if (initialSyncAppliedRef.current) return;
@@ -927,7 +1151,7 @@ const WatchRoom = () => {
    */
   const emitVideoSync = (eventName) => {
     const socket = socketRef.current;
-    const video = videoRef.current;
+    const video = videoRef.current?.video;
     if (!socket || !video) return;
     if (isProgrammaticRef.current) return;
     if (Date.now() < suppressEmitsUntilRef.current) return;
@@ -994,6 +1218,18 @@ const WatchRoom = () => {
     );
   };
 
+  const handleToggleAllControl = (allow) => {
+    activeUsers.forEach(u => {
+      const uId = normalizeId(u.id || u._id);
+      if (uId === hostUserId) return;
+      if (allow) {
+        handleGrantControl(uId);
+      } else {
+        handleRevokeControl(uId);
+      }
+    });
+  };
+
   if (loadingRoom) {
     return (
       <div className="
@@ -1042,6 +1278,7 @@ const WatchRoom = () => {
           <div className="flex-1 flex flex-col gap-3 min-w-0">
             <section className="flex-1 relative rounded-3xl overflow-hidden border border-white/10 bg-black min-h-0">
               <HLSVideoPlayer
+                ref={videoRef}
                 streamUrl={
                   roomData?.movie?.videoFolderName
                     ? `${CLOUDFRONT_BASE_URL}/${roomData.movie.videoFolderName}/master.m3u8`
@@ -1089,15 +1326,54 @@ const WatchRoom = () => {
               </div>
             </section>
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-3 py-2">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold">Video Call:</span>
+                {inCall ? (
+                  <>
+                    <button
+                      onClick={toggleMute}
+                      className={`p-2 rounded-xl transition-all ${
+                        isMuted ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      }`}
+                      title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                    >
+                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={toggleCamera}
+                      className={`p-2 rounded-xl transition-all ${
+                        isCameraOff ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      }`}
+                      title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
+                    >
+                      {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={leaveVideoCall}
+                      className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 transition-all flex items-center gap-2 text-sm"
+                    >
+                      <PhoneOff className="w-4 h-4" /> Leave Call
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={joinVideoCall}
+                    className="px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/30 text-green-300 hover:bg-green-500/20 transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Phone className="w-4 h-4" /> Join Video Call
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
                 <input
                   type="text"
                   placeholder="Type a message..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={handleChatKeyDown}
-                  className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-white/40"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 outline-none text-white text-sm placeholder:text-white/40 focus:border-gold/50"
                 />
                 <button
                   onClick={handleSendMessage}
@@ -1119,36 +1395,140 @@ const WatchRoom = () => {
                 transition={{ duration: 0.3 }}
                 className="w-[290px] rounded-3xl border border-white/10 bg-black/30 backdrop-blur-2xl p-4 overflow-y-auto shrink-0"
               >
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-lg font-bold">Participants</h2>
-                  <span className="text-xs text-white/50">{activeUsers.length} online</span>
+                <div className="flex flex-col gap-2 mb-5 pb-3 border-b border-white/10">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold">Participants</h2>
+                    <span className="text-xs text-white/50">{activeUsers.length} online</span>
+                  </div>
+                  {isRoomHost && (
+                    <div className="flex items-center justify-between mt-2 bg-white/5 px-3 py-2 rounded-xl border border-white/5">
+                      <span className="text-xs text-white/80 font-medium">Co-control Playback</span>
+                      <button
+                        onClick={() => {
+                          const anyParticipantHasControl = activeUsers.some(u => {
+                            const uId = normalizeId(u.id || u._id);
+                            return uId !== hostUserId && canUserControlPlayback(u);
+                          });
+                          handleToggleAllControl(!anyParticipantHasControl);
+                        }}
+                        className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 ${
+                          activeUsers.some(u => normalizeId(u.id || u._id) !== hostUserId && canUserControlPlayback(u))
+                            ? 'bg-gold'
+                            : 'bg-white/20'
+                        }`}
+                      >
+                        <div
+                          className={`bg-black w-4 h-4 rounded-full shadow-md transform duration-300 ${
+                            activeUsers.some(u => normalizeId(u.id || u._id) !== hostUserId && canUserControlPlayback(u))
+                              ? 'translate-x-4'
+                              : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex flex-col gap-4">
-                  {activeUsers.map((participant, index) => (
-                    <div
-                      key={participant.id || participant._id || index}
-                      className="rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-4 min-h-[220px]"
-                    >
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-3 border border-white/10 shrink-0">
-                        {isCurrentUser(participant) && currentUser?.profilePicture ? (
-                          <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-                        ) : participant?.profilePicture ? (
-                          <img src={participant.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                <div className="flex flex-col gap-3">
+                  {activeUsers.map((participant, index) => {
+                    const pId = normalizeId(participant.id || participant._id);
+                    const isSelf = isCurrentUser(participant);
+                    const hasVideo = isSelf ? (inCall && !isCameraOff && localStream) : (participant.inCall && !participant.isCameraOff && remoteStreams[pId]);
+                    const isMutedState = isSelf ? isMuted : participant.isMuted;
+
+                    return (
+                      <div
+                        key={pId || index}
+                        className="w-full aspect-video rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-3 relative overflow-hidden"
+                      >
+                        {hasVideo ? (
+                          <div className="absolute inset-0 w-full h-full bg-black z-0">
+                            <video
+                              ref={el => {
+                                if (el) {
+                                  el.srcObject = isSelf ? localStream : remoteStreams[pId];
+                                }
+                              }}
+                              autoPlay
+                              playsInline
+                              muted={isSelf}
+                              className={`w-full h-full object-cover ${isSelf ? 'transform -scale-x-100' : ''}`}
+                            />
+                            
+                            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10 bg-black/60 backdrop-blur-md rounded-lg px-2 py-1 border border-white/5">
+                              <span className="text-[10px] text-white truncate max-w-[120px]">
+                                {participant.nickName || participant.name} {isSelf && '(You)'}
+                              </span>
+                              {isMutedState && (
+                                <MicOff className="w-3 h-3 text-red-400 shrink-0" />
+                              )}
+                            </div>
+                          </div>
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gold to-yellow-500" />
+                          <>
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-1 border border-white/10 shrink-0 relative">
+                              {isSelf && currentUser?.profilePicture ? (
+                                <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                              ) : participant?.profilePicture ? (
+                                <img src={participant.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-gold to-yellow-500" />
+                              )}
+                              
+                              {participant.inCall && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                  <VideoOff className="w-4 h-4 text-white/80" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <p className="text-xs text-white text-center font-medium line-clamp-1">
+                              {participant.nickName || participant.name}
+                              {isSelf ? ' (You)' : ''}
+                            </p>
+                            
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                              <p className="text-[10px] text-green-400">Online</p>
+                              {participant.inCall && (
+                                <span className="text-[9px] bg-green-500/20 text-green-300 px-1 py-0.5 rounded border border-green-500/20 font-semibold">
+                                  In Call
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mt-1">
+                              {isMutedState && participant.inCall && (
+                                <div className="flex items-center gap-0.5 text-red-400 text-[10px]">
+                                  <MicOff className="w-2.5 h-2.5" />
+                                  <span>Muted</span>
+                                </div>
+                              )}
+
+                              {!isRoomHost && canUserControlPlayback(participant) && (
+                                <span className="text-[9px] bg-gold/10 text-gold px-1 py-0.5 rounded border border-gold/20 font-semibold">
+                                  Control
+                                </span>
+                              )}
+                            </div>
+
+                            {isRoomHost && !isSelf && (
+                              <button
+                                onClick={() => canUserControlPlayback(participant) ? handleRevokeControl(pId) : handleGrantControl(pId)}
+                                className={`mt-2 text-[9px] px-2 py-0.5 rounded border transition-all ${
+                                  canUserControlPlayback(participant)
+                                    ? 'bg-gold/20 text-gold border-gold/30 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30'
+                                    : 'bg-white/5 text-white/50 border-white/10 hover:bg-gold/20 hover:text-gold hover:border-gold/30'
+                                }`}
+                              >
+                                {canUserControlPlayback(participant) ? 'Revoke Control' : 'Grant Control'}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
-                      <p className="text-sm text-white text-center font-medium line-clamp-2">
-                        {participant.nickName || participant.name}
-                        {isCurrentUser(participant) ? ' (You)' : ''}
-                      </p>
-                      <p className="text-xs text-green-400 mt-1">Online</p>
-                      {canUserControlPlayback(participant) && (
-                        <p className="text-[11px] text-gold mt-2 text-center">Playback Control</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.aside>
             )}

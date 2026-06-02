@@ -958,6 +958,49 @@ function initializeSocket(httpServer) {
         });
 
         /**
+         * WebRTC Signaling for Watch Room Video Calls
+         */
+        socket.on('webrtc:signal', (data = {}) => {
+            const { targetUserId, signal } = data;
+            if (!targetUserId || !signal) return;
+
+            const targetSocketId = onlineUsers.get(targetUserId.toString());
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('webrtc:signal', {
+                    senderUserId: userId,
+                    signal
+                });
+            }
+        });
+
+        /**
+         * Update video call state of a participant
+         */
+        socket.on('call:state-change', (data = {}) => {
+            const { roomId, inCall, isMuted, isCameraOff } = data;
+            if (!roomId) return;
+
+            const roomKey = roomId.toString();
+            const roomUsers = watchRoomPresence.get(roomKey);
+            if (roomUsers && roomUsers.has(userId)) {
+                const userPayload = roomUsers.get(userId);
+                userPayload.inCall = !!inCall;
+                userPayload.isMuted = !!isMuted;
+                userPayload.isCameraOff = !!isCameraOff;
+                roomUsers.set(userId, userPayload);
+
+                const allUsers = Array.from(roomUsers.values());
+                const watchSocketRoom = `watch:${roomKey}`;
+                
+                // Broadcast updated user list to everyone in the room
+                io.to(watchSocketRoom).emit('room-users', {
+                    roomId: roomKey,
+                    users: allUsers
+                });
+            }
+        });
+
+        /**
          * Disconnect
          */
         socket.on('disconnect', () => {

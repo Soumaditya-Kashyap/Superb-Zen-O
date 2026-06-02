@@ -21,13 +21,25 @@ const CONTROLS_QUICK_HIDE_DELAY = 500;
 const QUALITY_SWITCH_DELAY = 100;
 const STREAM_SOURCE = 'CloudFront';
 
-const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSeeked, controlsDisabled = false }, ref) => {
+const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSeeked, controlsDisabled = false, autoPlay = false }, ref) => {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const containerRef = useRef(null);
   const progressBarRef = useRef(null);
   const controlsRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const [showNoAccessToast, setShowNoAccessToast] = useState(false);
+  const toastTimeoutRef = useRef(null);
+
+  const triggerNoAccessToast = useCallback(() => {
+    setShowNoAccessToast(true);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setShowNoAccessToast(false);
+    }, 2000);
+  }, []);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -98,10 +110,12 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
         setIsLoading(false);
         
         // Auto-play
-        video.play().catch((err) => {
-          console.warn('Autoplay prevented:', err.message);
-          setIsLoading(false);
-        });
+        if (autoPlay) {
+          video.play().catch((err) => {
+            console.warn('Autoplay prevented:', err.message);
+            setIsLoading(false);
+          });
+        }
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
@@ -150,6 +164,9 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = streamUrl;
       setIsLoading(false);
+      if (autoPlay) {
+        video.play().catch((err) => console.warn('Native autoplay prevented:', err.message));
+      }
     } else {
       setError('Your browser does not support HLS video playback');
       setIsLoading(false);
@@ -161,6 +178,9 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
       }
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+      }
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
       }
     };
   }, [streamUrl]);
@@ -256,15 +276,19 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   }, [isPlaying]);
 
   const togglePlay = useCallback(() => {
+    if (controlsDisabled) {
+      triggerNoAccessToast();
+      return;
+    }
     const video = videoRef.current;
     if (!video) return;
     
     if (video.paused) {
-      video.play();
+      video.play().catch((err) => console.warn('Play prevented:', err.message));
     } else {
       video.pause();
     }
-  }, []);
+  }, [controlsDisabled, triggerNoAccessToast]);
 
   const toggleMute = useCallback(() => {
     const video = videoRef.current;
@@ -628,14 +652,19 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   )}
 </AnimatePresence>
 
-      {/* Locked Controls Message */}
-      {controlsDisabled && !isLoading && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-sm px-6 py-3 rounded-xl border border-white/20 shadow-2xl">
-          <p className="text-sm text-white/80 text-center font-medium">
-            🔒 Playback controls are locked. Video sync stays automatic until access is granted.
-          </p>
-        </div>
-      )}
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {showNoAccessToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 20, x: '-50%' }}
+            className="absolute bottom-10 left-1/2 bg-red-500/90 text-white px-5 py-2.5 rounded-xl border border-red-400/20 shadow-2xl z-50 text-sm font-semibold whitespace-nowrap"
+          >
+            ⚠️ You don't have access
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

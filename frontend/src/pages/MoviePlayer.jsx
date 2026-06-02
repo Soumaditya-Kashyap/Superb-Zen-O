@@ -277,6 +277,7 @@ const MoviePlayer = () => {
         streamUrl={streamUrl}
         movieTitle={movie.Title}
         posterUrl={movie.Poster !== 'N/A' ? movie.Poster : '/placeholder-movie.jpg'}
+        autoPlay={true}
       />
     ) : (
       /* Coming Soon Overlay */
