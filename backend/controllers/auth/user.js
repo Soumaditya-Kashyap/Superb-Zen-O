@@ -4,6 +4,7 @@
  */
 
 const User = require('../../models/user');
+const imagekit = require('../../utils/imagekit');
 
 /**
  * Get current user
@@ -71,3 +72,54 @@ exports.logout = async (req, res) => {
         });
     }
 };
+
+
+/**
+ *  user profile picture upload
+ * POST /api/auth/upload-profile-picture
+ */
+exports.uploadProfilePicture = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ 
+                success: false,
+                message: "No file uploaded" 
+            });
+        }
+
+        const user = await User.findById(req.user.id);
+        
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: "User not found" 
+            });
+        }
+
+        const uploadResult = await imagekit.upload({
+            file: req.file.buffer,
+            fileName: `profile_${user._id}_${Date.now()}.jpg`,
+            folder: "/profile_pictures/"
+        });
+
+        user.profilePicture = uploadResult.url;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            profilePicture: user.profilePicture
+        });
+
+    } catch (error) {
+        console.error('Profile picture upload error:', error);
+        return res.status(500).json({ 
+            success: false,
+            message: "Error uploading profile picture",
+            error: error.message 
+        });
+    }
+};
+
+
+
+

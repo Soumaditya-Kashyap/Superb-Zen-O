@@ -33,7 +33,7 @@ const About = () => {
             transition={{ repeat: Infinity, duration: 3 }}
             className="text-6xl font-bold mb-4"
           >
-            🎬 Superb 
+             Superb 
           </motion.h1>
 
           <p className="text-gray-400 text-lg">
@@ -52,7 +52,7 @@ const About = () => {
           className={`${cardClass} mb-8`}
         >
           <h2 className="text-2xl text-yellow-400 mb-3">
-            🌍 Overview
+             Overview
           </h2>
 
           <p className="text-gray-300 leading-relaxed">
@@ -75,7 +75,7 @@ const About = () => {
             className={cardClass}
           >
             <h3 className="text-xl mb-2 text-yellow-400">
-              🎥 Sync Player
+               Sync Player
             </h3>
 
             <p className="text-gray-400">
@@ -93,7 +93,7 @@ const About = () => {
             className={cardClass}
           >
             <h3 className="text-xl mb-2 text-yellow-400">
-              👥 Watch Together
+               Watch Together
             </h3>
 
             <p className="text-gray-400">
@@ -111,7 +111,7 @@ const About = () => {
             className={cardClass}
           >
             <h3 className="text-xl mb-2 text-yellow-400">
-              🚀 Modern UI
+               Modern UI
             </h3>
 
             <p className="text-gray-400">
@@ -132,17 +132,17 @@ const About = () => {
           className={`${cardClass} mb-8`}
         >
           <h2 className="text-2xl text-yellow-400 mb-3">
-            🤖 Future Features
+            Future Features
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4 text-gray-300">
 
-            <div>📞 voice & video call integration</div>
-            <div>📺 live streaming support</div>
-            <div>😊 emoji reactions</div>
-            <div>🌐 adaptive video quality</div>
-            <div>🎯 group recommendations</div>
-            <div>⚡ high performance player</div>
+            <div> voice & video call integration</div>
+            <div> live streaming support</div>
+            <div> emoji reactions</div>
+            <div> adaptive video quality</div>
+            <div> group recommendations</div>
+            <div>high performance player</div>
 
           </div>
 
@@ -159,7 +159,7 @@ const About = () => {
           className={cardClass}
         >
           <h2 className="text-2xl text-yellow-400 mb-4">
-            🛠 Tech Stack
+             Tech Stack
           </h2>
 
           <div className="flex flex-wrap gap-3">

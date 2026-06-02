@@ -6,7 +6,7 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/database');
 const errorHandler = require('./middlewares/errorHandler');
 const requestLogger = require('./middlewares/requestLogger');
-
+const authMiddleware = require('./middlewares/authMiddleware');
 // Load environment variables first
 dotenv.config();
 
@@ -18,6 +18,7 @@ require('./models/ChatRoom');
 require('./models/Message');
 require('./models/WatchRoom');
 require('./models/Notification');
+require('./models/SupportMessage');
 
 const { initializeSocket } = require('./socket');
 const notificationService = require('./utils/notificationService');
@@ -67,6 +68,26 @@ app.use('/api/video', require('./routes/video'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/rooms', require('./routes/rooms'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/support', require('./routes/supportRoutes'));
+
+
+
+app.use(
+   "/api/youtube",
+   require("./routes/youtube")
+);
+
+app.use(
+    "/api/profile",
+    authMiddleware, // Ensure user is authenticated for profile routes
+    require("./routes/profile")
+);
+
+app.use(
+    "/api/user",
+    authMiddleware, require("./routes/setting") // Ensure user is authenticated for setting routes
+    
+);
 
 // Error handling middleware
 app.use(errorHandler);

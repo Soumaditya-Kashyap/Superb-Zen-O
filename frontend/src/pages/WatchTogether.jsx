@@ -21,6 +21,8 @@ import CreateRoomModal from '../components/CreateRoomModal';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
+import { useLocation } from "react-router-dom";   ///////////// by raki
+
 const WatchTogether = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -401,6 +403,28 @@ const WatchTogether = () => {
     }
   };
 
+
+
+  const location = useLocation(); //////by raki
+  const [youtubeMovie, setYoutubeMovie] =useState(null);
+useEffect(() => {
+
+  if (
+    location.state?.youtubeMovie
+  ) {
+
+    setYoutubeMovie(
+      location.state.youtubeMovie
+    );
+
+
+
+    // auto open create modal
+    setShowCreateModal(true);
+
+  }
+
+}, [location.state]);
   return (
     <div className="min-h-screen p-6 md:p-10">
       {/* Header */}
@@ -713,6 +737,7 @@ const WatchTogether = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onRoomCreated={handleRoomCreated}
+         youtubeMovie={youtubeMovie}      ////////by raki
       />
 
       {/* Join Room Modal */}
