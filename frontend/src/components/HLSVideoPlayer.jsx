@@ -30,6 +30,9 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   const controlsTimeoutRef = useRef(null);
   const [showNoAccessToast, setShowNoAccessToast] = useState(false);
   const toastTimeoutRef = useRef(null);
+  const bufferTimeoutRef = useRef(null);
+  const recoveryTimeoutRef = useRef(null);
+  const isForcedLowQualityRef = useRef(false);
 
   const triggerNoAccessToast = useCallback(() => {
     setShowNoAccessToast(true);
@@ -182,6 +185,12 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
+      if (bufferTimeoutRef.current) {
+        clearTimeout(bufferTimeoutRef.current);
+      }
+      if (recoveryTimeoutRef.current) {
+        clearTimeout(recoveryTimeoutRef.current);
+      }
     };
   }, [streamUrl]);
 
@@ -200,8 +209,39 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
       setIsPlaying(false);
       if (onPause && !controlsDisabled) onPause();
     };
-    const handleWaiting = () => setBuffering(true);
-    const handleCanPlay = () => setBuffering(false);
+    const handleWaiting = () => {
+      setBuffering(true);
+      if (recoveryTimeoutRef.current) {
+        clearTimeout(recoveryTimeoutRef.current);
+        recoveryTimeoutRef.current = null;
+      }
+      if (bufferTimeoutRef.current) return;
+      bufferTimeoutRef.current = setTimeout(() => {
+        if (hlsRef.current && hlsRef.current.levels && hlsRef.current.levels.length > 0) {
+          console.log('[ABR] Slow connection detected: downshifting quality to lowest.');
+          hlsRef.current.currentLevel = 0;
+          isForcedLowQualityRef.current = true;
+          setCurrentQuality(`Auto (Optimizing...)`);
+        }
+      }, 1500);
+    };
+    const handleCanPlay = () => {
+      setBuffering(false);
+      if (bufferTimeoutRef.current) {
+        clearTimeout(bufferTimeoutRef.current);
+        bufferTimeoutRef.current = null;
+      }
+      if (isForcedLowQualityRef.current && !recoveryTimeoutRef.current) {
+        recoveryTimeoutRef.current = setTimeout(() => {
+          if (hlsRef.current) {
+            console.log('[ABR] Stabilized: restoring Auto quality.');
+            hlsRef.current.currentLevel = -1;
+            isForcedLowQualityRef.current = false;
+          }
+          recoveryTimeoutRef.current = null;
+        }, 10000);
+      }
+    };
     const handleSeeked = () => {
       if (onSeeked && !controlsDisabled) onSeeked();
     };

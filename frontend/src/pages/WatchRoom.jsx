@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Hls from 'hls.js';
@@ -24,8 +24,8 @@ const SAMPLE_VIDEO_URL =
     .VITE_WATCHROOM_SAMPLE_VIDEO_URL ||
   'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
 
-const SYNC_THRESHOLD = 1.5;
-const HEARTBEAT_INTERVAL = 7000;
+const SYNC_THRESHOLD = 0.15;
+const HEARTBEAT_INTERVAL = 3000;
 const BUFFER_DELAY = 200;
 const SUPPRESS_EMIT_DURATION = 650;
 const PROGRAMMATIC_FLAG_DURATION = 180;
@@ -79,6 +79,26 @@ const WatchRoom = () => {
   const lastHeartbeatTimeRef = useRef(0);
   const initialSyncAppliedRef = useRef(false);
   const pendingVideoStateRef = useRef(null);
+
+  // Sync Loop Prevention and Clock Offset Refs
+  const expectedProgrammaticSeekTimeRef = useRef(null);
+  const expectedProgrammaticPlayRef = useRef(false);
+  const expectedProgrammaticPauseRef = useRef(false);
+  const clockOffsetRef = useRef(0);
+  const lastHostStateRef = useRef({ time: 0, serverTimestamp: 0, isPlaying: false });
+  const [videoElement, setVideoElement] = useState(null);
+
+  const playerRefCallback = useCallback((node) => {
+    if (node) {
+      videoRef.current = node;
+      setVideoElement(node.video);
+    } else {
+      videoRef.current = null;
+      setVideoElement(null);
+    }
+  }, []);
+
+  // Event listeners moved below hasPlaybackControl initialization
 
   // const currentUser = useMemo(() => {
   //   try {
@@ -189,6 +209,97 @@ const WatchRoom = () => {
   const isRoomHost =
     !!normalizeId(currentUserId) && normalizeId(currentUserId) === hostUserId;
   const hasPlaybackControl = canControlPlayback || isRoomHost;
+
+  // Direct Video Element Sync Event Listeners (Bypasses components barriers)
+  useEffect(() => {
+    if (!videoElement) return undefined;
+
+    const onLocalPlay = () => {
+      if (expectedProgrammaticPlayRef.current) {
+        expectedProgrammaticPlayRef.current = false;
+        return;
+      }
+      if (hasPlaybackControl) {
+        emitVideoSync('video-play');
+      }
+    };
+
+    const onLocalPause = () => {
+      if (expectedProgrammaticPauseRef.current) {
+        expectedProgrammaticPauseRef.current = false;
+        return;
+      }
+      if (hasPlaybackControl) {
+        emitVideoSync('video-pause');
+      }
+    };
+
+    const onLocalSeeked = () => {
+      if (expectedProgrammaticSeekTimeRef.current !== null) {
+        const diff = Math.abs(videoElement.currentTime - expectedProgrammaticSeekTimeRef.current);
+        if (diff < 0.5) {
+          expectedProgrammaticSeekTimeRef.current = null;
+          return;
+        }
+      }
+      if (hasPlaybackControl) {
+        const socket = socketRef.current;
+        if (socket) {
+          socket.emit('video-seek', {
+            roomId: resolvedRoomId || roomId,
+            time: videoElement.currentTime || 0,
+            isPlaying: !videoElement.paused,
+            clientTimestamp: Date.now()
+          });
+          console.log(`[EMIT] video-seek: time=${videoElement.currentTime.toFixed(2)}s, isPlaying=${!videoElement.paused}`);
+        }
+      }
+    };
+
+    const onLocalTimeUpdate = () => {
+      if (!hasPlaybackControl && lastHostStateRef.current && lastHostStateRef.current.isPlaying) {
+        const state = lastHostStateRef.current;
+        const elapsed = Math.max(0, (Date.now() + clockOffsetRef.current - state.serverTimestamp) / 1000);
+        const estimatedHostTime = state.time + elapsed;
+        const currentDrift = videoElement.currentTime - estimatedHostTime;
+        const absDrift = Math.abs(currentDrift);
+        
+        if (absDrift < 0.05) {
+          if (videoElement.playbackRate !== 1.0) {
+            videoElement.playbackRate = 1.0;
+            console.log(`[SYNC-SPEED] Re-aligned! Drift is ${currentDrift.toFixed(3)}s. Resetting speed to 1.0`);
+          }
+        } else if (absDrift <= 1.5) {
+          const targetRate = currentDrift < 0 ? 1.05 : 0.95;
+          if (videoElement.playbackRate !== targetRate) {
+            videoElement.playbackRate = targetRate;
+            console.log(`[SYNC-SPEED] Adjusting speed to ${targetRate} (drift: ${currentDrift.toFixed(3)}s)`);
+          }
+        } else {
+          console.log(`[SYNC-SPEED] Drift too large (${currentDrift.toFixed(3)}s), performing hard seek`);
+          isProgrammaticRef.current = true;
+          expectedProgrammaticSeekTimeRef.current = estimatedHostTime;
+          videoElement.currentTime = estimatedHostTime;
+          videoElement.playbackRate = 1.0;
+          setTimeout(() => {
+            isProgrammaticRef.current = false;
+          }, PROGRAMMATIC_FLAG_DURATION);
+        }
+      }
+    };
+
+    videoElement.addEventListener('play', onLocalPlay);
+    videoElement.addEventListener('pause', onLocalPause);
+    videoElement.addEventListener('seeked', onLocalSeeked);
+    videoElement.addEventListener('timeupdate', onLocalTimeUpdate);
+
+    return () => {
+      videoElement.removeEventListener('play', onLocalPlay);
+      videoElement.removeEventListener('pause', onLocalPause);
+      videoElement.removeEventListener('seeked', onLocalSeeked);
+      videoElement.removeEventListener('timeupdate', onLocalTimeUpdate);
+    };
+  }, [videoElement, hasPlaybackControl, resolvedRoomId, roomId]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -699,29 +810,41 @@ const WatchRoom = () => {
       currentUser.name ||
       'You';
 
+    const syncClock = () => {
+      if (socket && socket.connected) {
+        socket.emit('sync:ping', { clientTime: Date.now() });
+      }
+    };
+
+    let clockSyncInterval = null;
+
     socket.on('connect', () => {
       socket.emit(
         'join-room',
         {
           roomId,
-
           user: {
-            id:
-              currentUser?.id ||
-              currentUser?._id,
-
-            name:
-              currentUser?.name,
-
-            nickName:
-              currentUser?.nickName,
-
-            profilePicture:
-              currentUser?.profilePicture,
+            id: currentUser?.id || currentUser?._id,
+            name: currentUser?.name,
+            nickName: currentUser?.nickName,
+            profilePicture: currentUser?.profilePicture,
           },
         }
       );
+      syncClock();
+      clockSyncInterval = setInterval(syncClock, 15000);
+      
+      // Proactively sync on reconnect
+      socket.emit('video-sync-request', { roomId });
+    });
 
+    socket.on('sync:pong', (data) => {
+      const { clientTime, serverTime } = data;
+      const now = Date.now();
+      const rtt = now - clientTime;
+      const offset = serverTime - (clientTime + now) / 2;
+      clockOffsetRef.current = offset;
+      console.log(`[SYNC-CLOCK] RTT: ${rtt}ms, Clock Offset: ${offset}ms`);
     });
 
     socket.on(
@@ -836,29 +959,50 @@ const WatchRoom = () => {
     });
 
     /**
-     * IMPROVED: video-play handler with buffering
+     * IMPROVED: video-play handler with clock compensation and loop prevention
      */
     socket.on('video-play', async (payload) => {
       const video = videoRef.current?.video;
       if (!video) return;
       
+      const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time);
       const bufferDelay = payload?.bufferDelay || BUFFER_DELAY;
+
+      // Compensate for network transit time
+      let compensatedTime = targetTime;
+      if (serverTimestamp) {
+        const elapsed = Math.max(0, (Date.now() + clockOffsetRef.current - serverTimestamp) / 1000);
+        compensatedTime += elapsed;
+      }
+
+      // Update host state ref
+      lastHostStateRef.current = {
+        time: targetTime,
+        serverTimestamp: serverTimestamp || Date.now(),
+        isPlaying: true
+      };
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
-      if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.6) {
-        video.currentTime = targetTime;
+      const drift = Math.abs(video.currentTime - compensatedTime);
+      if (Number.isFinite(compensatedTime) && drift > SYNC_THRESHOLD) {
+        expectedProgrammaticSeekTimeRef.current = compensatedTime;
+        video.currentTime = compensatedTime;
       }
 
       // Buffer before playing for smooth sync
       setTimeout(async () => {
         try {
-          await video.play();
-          console.log(`[SYNC] Play received: time=${targetTime.toFixed(2)}s`);
+          if (video.paused) {
+            expectedProgrammaticPlayRef.current = true;
+            await video.play();
+          }
+          console.log(`[SYNC] Play received: time=${compensatedTime.toFixed(2)}s`);
         } catch (err) {
           console.warn('[SYNC] Play failed:', err.message);
+          expectedProgrammaticPlayRef.current = false;
         }
         
         setTimeout(() => {
@@ -875,14 +1019,28 @@ const WatchRoom = () => {
       if (!video) return;
       
       const targetTime = Number(payload?.time);
+      const serverTimestamp = Number(payload?.serverTimestamp);
+
+      // Update host state ref
+      lastHostStateRef.current = {
+        time: targetTime,
+        serverTimestamp: serverTimestamp || Date.now(),
+        isPlaying: false
+      };
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
-      if (Number.isFinite(targetTime) && Math.abs(video.currentTime - targetTime) > 0.6) {
+      const drift = Math.abs(video.currentTime - targetTime);
+      if (Number.isFinite(targetTime) && drift > SYNC_THRESHOLD) {
+        expectedProgrammaticSeekTimeRef.current = targetTime;
         video.currentTime = targetTime;
       }
-      video.pause();
+      
+      if (!video.paused) {
+        expectedProgrammaticPauseRef.current = true;
+        video.pause();
+      }
       console.log(`[SYNC] Pause received: time=${targetTime.toFixed(2)}s`);
 
       setTimeout(() => {
@@ -893,18 +1051,54 @@ const WatchRoom = () => {
     /**
      * IMPROVED: video-seek handler
      */
-    socket.on('video-seek', (payload) => {
+    socket.on('video-seek', async (payload) => {
       const video = videoRef.current?.video;
       if (!video) return;
       
+      const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time);
+      const isPlayingNow = !!payload?.isPlaying;
       if (!Number.isFinite(targetTime)) return;
+
+      // Compensate seek time if playing
+      let compensatedTime = targetTime;
+      if (isPlayingNow && serverTimestamp) {
+        const elapsed = Math.max(0, (Date.now() + clockOffsetRef.current - serverTimestamp) / 1000);
+        compensatedTime += elapsed;
+      }
+
+      // Update host state ref
+      lastHostStateRef.current = {
+        time: targetTime,
+        serverTimestamp: serverTimestamp || Date.now(),
+        isPlaying: isPlayingNow
+      };
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
 
-      video.currentTime = targetTime;
-      video.pause();
+      // Force update position
+      expectedProgrammaticSeekTimeRef.current = compensatedTime;
+      video.currentTime = compensatedTime;
+
+      // Match play/pause state
+      if (isPlayingNow) {
+        if (video.paused) {
+          expectedProgrammaticPlayRef.current = true;
+          try {
+            await video.play();
+          } catch (e) {
+            expectedProgrammaticPlayRef.current = false;
+          }
+        }
+      } else {
+        if (!video.paused) {
+          expectedProgrammaticPauseRef.current = true;
+          video.pause();
+        }
+      }
+
+      console.log(`[SYNC] Seek received: time=${compensatedTime.toFixed(2)}s, playing=${isPlayingNow}`);
 
       setTimeout(() => {
         isProgrammaticRef.current = false;
@@ -912,30 +1106,63 @@ const WatchRoom = () => {
     });
 
     /**
-     * IMPROVED: video-heartbeat handler with threshold-based sync
+     * IMPROVED: video-heartbeat handler with dynamic speed alignment
      */
     socket.on('video-heartbeat', (payload) => {
       const video = videoRef.current?.video;
       if (!video) return;
 
+      const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time || 0);
       const isPlayingNow = !!payload?.isPlaying;
-      const currentTime = video.currentTime;
-      const drift = Math.abs(currentTime - targetTime);
 
-      if (drift > SYNC_THRESHOLD) {
-        console.log(`[SYNC] Heartbeat corrected: local=${currentTime.toFixed(2)}s, target=${targetTime.toFixed(2)}s (drift=${drift.toFixed(2)}s)`);
+      // Update last known host state
+      lastHostStateRef.current = {
+        time: targetTime,
+        serverTimestamp: serverTimestamp || Date.now(),
+        isPlaying: isPlayingNow
+      };
+
+      let compensatedTime = targetTime;
+      if (isPlayingNow && serverTimestamp) {
+        const elapsed = Math.max(0, (Date.now() + clockOffsetRef.current - serverTimestamp) / 1000);
+        compensatedTime += elapsed;
+      }
+
+      const currentTime = video.currentTime;
+      const drift = Math.abs(currentTime - compensatedTime);
+
+      if (drift > 1.5) {
+        console.log(`[SYNC] Heartbeat corrected (Hard seek): local=${currentTime.toFixed(2)}s, target=${compensatedTime.toFixed(2)}s (drift=${drift.toFixed(2)}s)`);
         isProgrammaticRef.current = true;
-        video.currentTime = targetTime;
+        expectedProgrammaticSeekTimeRef.current = compensatedTime;
+        video.currentTime = compensatedTime;
+        video.playbackRate = 1.0;
         setTimeout(() => {
           isProgrammaticRef.current = false;
         }, PROGRAMMATIC_FLAG_DURATION);
+      } else if (drift > 0.05) {
+        // Dynamic speed tuning
+        const targetRate = currentTime < compensatedTime ? 1.05 : 0.95;
+        if (video.playbackRate !== targetRate) {
+          video.playbackRate = targetRate;
+          console.log(`[SYNC-SPEED] Heartbeat speed adjust: targetRate=${targetRate} (drift=${(currentTime - compensatedTime).toFixed(3)}s)`);
+        }
+      } else {
+        if (video.playbackRate !== 1.0) {
+          video.playbackRate = 1.0;
+        }
       }
 
       if (isPlayingNow && video.paused) {
-        video.play().catch(() => {});
+        expectedProgrammaticPlayRef.current = true;
+        video.play().catch(() => {
+          expectedProgrammaticPlayRef.current = false;
+        });
       } else if (!isPlayingNow && !video.paused) {
+        expectedProgrammaticPauseRef.current = true;
         video.pause();
+        video.playbackRate = 1.0;
       }
     });
 
@@ -968,9 +1195,19 @@ const WatchRoom = () => {
       }
     });
 
+    // Listen to online events to proactively request state from backend when internet returns
+    const handleOnline = () => {
+      console.log('[WATCH] Internet connection recovered, requesting immediate sync');
+      socket.emit('video-sync-request', { roomId });
+    };
+
+    window.addEventListener('online', handleOnline);
+
     return () => {
       stopHeartbeat();
       cleanupAllConnections();
+      window.removeEventListener('online', handleOnline);
+      if (clockSyncInterval) clearInterval(clockSyncInterval);
       socket.disconnect();
     };
   }, [roomId]);
@@ -1278,7 +1515,7 @@ const WatchRoom = () => {
           <div className="flex-1 flex flex-col gap-3 min-w-0">
             <section className="flex-1 relative rounded-3xl overflow-hidden border border-white/10 bg-black min-h-0">
               <HLSVideoPlayer
-                ref={videoRef}
+                ref={playerRefCallback}
                 streamUrl={
                   roomData?.movie?.videoFolderName
                     ? `${CLOUDFRONT_BASE_URL}/${roomData.movie.videoFolderName}/master.m3u8`

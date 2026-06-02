@@ -672,7 +672,7 @@ function initializeSocket(httpServer) {
          * IMPROVED: Watch-room video sync: seek with latency compensation
          */
         socket.on('video-seek', async (data = {}) => {
-            const { roomId, time = 0, clientTimestamp } = data;
+            const { roomId, time = 0, isPlaying = false, clientTimestamp } = data;
 
             try {
                 if (!roomId) return;
@@ -700,6 +700,7 @@ function initializeSocket(httpServer) {
                 watchRoomLastUpdate.set(watchRoomId, serverTimestamp);
 
                 watchRoom.videoState.currentTime = Number.isFinite(time) ? time : 0;
+                watchRoom.videoState.isPlaying = !!isPlaying;
                 watchRoom.videoState.lastUpdated = new Date(serverTimestamp);
                 watchRoom.videoState.updatedBy = socket.user._id;
                 await watchRoom.save();
@@ -707,11 +708,12 @@ function initializeSocket(httpServer) {
                 socket.to(`watch:${watchRoom._id.toString()}`).emit('video-seek', {
                     roomId: watchRoom._id.toString(),
                     time: watchRoom.videoState.currentTime,
+                    isPlaying: watchRoom.videoState.isPlaying,
                     userId,
                     serverTimestamp
                 });
 
-                console.log(`[SOCKET] video-seek: room=${watchRoomId}, time=${time.toFixed(2)}s, user=${socket.user.nickName}`);
+                console.log(`[SOCKET] video-seek: room=${watchRoomId}, time=${time.toFixed(2)}s, isPlaying=${isPlaying}, user=${socket.user.nickName}`);
             } catch (error) {
                 console.error('[SOCKET] video-seek error:', error.message);
             }
@@ -757,6 +759,56 @@ function initializeSocket(httpServer) {
                 });
             } catch (error) {
                 console.error('[SOCKET] video-heartbeat error:', error.message);
+            }
+        });
+
+        /**
+         * Lightweight NTP Clock Sync Ping
+         */
+        socket.on('sync:ping', (data = {}) => {
+            const { clientTime } = data;
+            socket.emit('sync:pong', {
+                clientTime,
+                serverTime: Date.now()
+            });
+        });
+
+        /**
+         * Request the latest compensated video state from database
+         */
+        socket.on('video-sync-request', async (data = {}) => {
+            const { roomId } = data;
+            try {
+                if (!roomId) return;
+                let watchRoom = null;
+                if (/^[a-fA-F0-9]{24}$/.test(roomId)) {
+                    watchRoom = await WatchRoom.findById(roomId);
+                }
+                if (!watchRoom) {
+                    watchRoom = await WatchRoom.findOne({ inviteCode: roomId });
+                }
+                if (!watchRoom || watchRoom.status === 'ended') return;
+
+                const baseTime = Number(watchRoom.videoState?.currentTime || 0);
+                const isPlayingNow = !!watchRoom.videoState?.isPlaying;
+                const lastUpdatedAt = watchRoom.videoState?.lastUpdated
+                    ? new Date(watchRoom.videoState.lastUpdated).getTime()
+                    : Date.now();
+                const driftSeconds = isPlayingNow
+                    ? Math.max(0, (Date.now() - lastUpdatedAt) / 1000)
+                    : 0;
+
+                const compensatedTime = baseTime + driftSeconds;
+
+                socket.emit('video-heartbeat', {
+                    roomId: watchRoom._id.toString(),
+                    time: compensatedTime,
+                    isPlaying: isPlayingNow,
+                    serverTimestamp: Date.now()
+                });
+                console.log(`[SOCKET] video-sync-request: room=${watchRoom._id.toString()}, compensatedTime=${compensatedTime.toFixed(2)}s`);
+            } catch (error) {
+                console.error('[SOCKET] video-sync-request error:', error.message);
             }
         });
 
