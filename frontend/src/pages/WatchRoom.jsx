@@ -23,7 +23,7 @@ const HEARTBEAT_INTERVAL = 3000;
 const BUFFER_DELAY = 200;
 const SUPPRESS_EMIT_DURATION = 1200;
 const PROGRAMMATIC_FLAG_DURATION = 500;
-const SYNC_GRACE_PERIOD = 2000; // Don't let heartbeat override for 2s after receiving a sync event
+const SYNC_GRACE_PERIOD = 4000; // Don't let heartbeat override for 4s after a sync event (emit or receive)
 
 const getIceServers = (dynamicServers) => {
   if (dynamicServers && dynamicServers.length > 0) {
@@ -380,6 +380,7 @@ const WatchRoom = () => {
   const clockOffsetRef = useRef(0);
   const lastHostStateRef = useRef({ time: 0, serverTimestamp: 0, isPlaying: false });
   const lastSyncEventReceivedRef = useRef(0); // Timestamp of last explicit sync event (play/pause/seek)
+  const consecutiveHeartbeatMismatchRef = useRef(0); // Counter for consecutive heartbeat play/pause mismatches
   const [videoElement, setVideoElement] = useState(null);
 
   const playerRefCallback = useCallback((node) => {
@@ -601,7 +602,6 @@ const WatchRoom = () => {
     };
 
     const onLocalSeeked = () => {
-      console.log('[WatchRoom] onLocalSeeked triggered. expectedProgrammaticSeek:', expectedProgrammaticSeekTimeRef.current, 'hasPlaybackControl:', hasPlaybackControl);
       if (expectedProgrammaticSeekTimeRef.current !== null) {
         const diff = Math.abs(videoElement.currentTime - expectedProgrammaticSeekTimeRef.current);
         if (diff < 0.5) {
@@ -609,7 +609,16 @@ const WatchRoom = () => {
           return;
         }
       }
+      // Skip if programmatic or recently suppressed (prevents double-emission with play/pause)
+      if (isProgrammaticRef.current) return;
+      if (Date.now() < suppressEmitsUntilRef.current) return;
+
       if (hasPlaybackControl) {
+        // Set grace period to protect against stale heartbeats
+        lastSyncEventReceivedRef.current = Date.now();
+        suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+        consecutiveHeartbeatMismatchRef.current = 0;
+
         const socket = socketRef.current;
         if (socket) {
           socket.emit('video-seek', {
@@ -618,7 +627,6 @@ const WatchRoom = () => {
             isPlaying: !videoElement.paused,
             clientTimestamp: Date.now()
           });
-          console.log(`[EMIT] video-seek: time=${videoElement.currentTime.toFixed(2)}s, isPlaying=${!videoElement.paused}`);
         }
       }
     };
@@ -1355,6 +1363,11 @@ const WatchRoom = () => {
           serverTimestamp: Number(payload.videoState.serverTimestamp || Date.now()),
           isPlaying: !!payload.videoState.isPlaying
         };
+        // Set a long grace period to prevent heartbeat from auto-playing on room entry
+        // The extra 5000ms ensures heartbeats don't override for ~9 seconds after joining
+        lastSyncEventReceivedRef.current = Date.now() + 5000;
+        consecutiveHeartbeatMismatchRef.current = 0;
+
         const video = videoRef.current?.video;
         if (video) {
           if (video.readyState >= 1) {
@@ -1495,6 +1508,7 @@ const WatchRoom = () => {
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
       lastSyncEventReceivedRef.current = Date.now();
+      consecutiveHeartbeatMismatchRef.current = 0;
 
       const drift = Math.abs(video.currentTime - compensatedTime);
       if (Number.isFinite(compensatedTime) && drift > SYNC_THRESHOLD) {
@@ -1541,6 +1555,7 @@ const WatchRoom = () => {
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
       lastSyncEventReceivedRef.current = Date.now();
+      consecutiveHeartbeatMismatchRef.current = 0;
 
       const drift = Math.abs(video.currentTime - targetTime);
       if (Number.isFinite(targetTime) && drift > SYNC_THRESHOLD) {
@@ -1588,6 +1603,7 @@ const WatchRoom = () => {
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
       lastSyncEventReceivedRef.current = Date.now();
+      consecutiveHeartbeatMismatchRef.current = 0;
 
       // Force update position
       expectedProgrammaticSeekTimeRef.current = compensatedTime;
@@ -1629,23 +1645,23 @@ const WatchRoom = () => {
         return;
       }
 
-      // During grace period after an explicit sync event (play/pause/seek),
-      // only update lastHostStateRef but DON'T apply corrections.
-      // This prevents the heartbeat from fighting with a just-received play/pause/seek command.
+      // During grace period after an explicit sync event (play/pause/seek/emit/join),
+      // only update lastHostStateRef but DON'T apply any corrections.
+      // This prevents stale heartbeats from fighting with a just-emitted or just-received command.
       const inGracePeriod = Date.now() - lastSyncEventReceivedRef.current < SYNC_GRACE_PERIOD;
 
       const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time || 0);
       const isPlayingNow = !!payload?.isPlaying;
 
-      // Always update last known host state
+      // Always update last known host state (for timeupdate drift correction later)
       lastHostStateRef.current = {
         time: targetTime,
         serverTimestamp: serverTimestamp || Date.now(),
         isPlaying: isPlayingNow
       };
 
-      // Skip corrections during grace period to avoid fighting explicit sync events
+      // Skip ALL corrections during grace period
       if (inGracePeriod) return;
 
       let compensatedTime = targetTime;
@@ -1657,37 +1673,50 @@ const WatchRoom = () => {
       const currentTime = video.currentTime;
       const drift = Math.abs(currentTime - compensatedTime);
 
-      if (drift > 2.0) {
-        console.log(`[SYNC] Heartbeat corrected (Hard seek): local=${currentTime.toFixed(2)}s, target=${compensatedTime.toFixed(2)}s (drift=${drift.toFixed(2)}s)`);
-        isProgrammaticRef.current = true;
-        expectedProgrammaticSeekTimeRef.current = compensatedTime;
-        video.currentTime = compensatedTime;
-        video.playbackRate = 1.0;
-        setTimeout(() => {
-          isProgrammaticRef.current = false;
-        }, PROGRAMMATIC_FLAG_DURATION);
-      } else if (drift > 0.1) {
-        // Dynamic speed tuning - gentler adjustment
-        const targetRate = currentTime < compensatedTime ? 1.03 : 0.97;
-        if (video.playbackRate !== targetRate) {
-          video.playbackRate = targetRate;
+      // Time drift correction (only when play/pause states already match)
+      const statesMatch = (isPlayingNow && !video.paused) || (!isPlayingNow && video.paused);
+      if (statesMatch) {
+        consecutiveHeartbeatMismatchRef.current = 0;
+        if (isPlayingNow) {
+          // Only correct time drift when both sides are playing
+          if (drift > 2.0) {
+            isProgrammaticRef.current = true;
+            expectedProgrammaticSeekTimeRef.current = compensatedTime;
+            video.currentTime = compensatedTime;
+            video.playbackRate = 1.0;
+            setTimeout(() => {
+              isProgrammaticRef.current = false;
+            }, PROGRAMMATIC_FLAG_DURATION);
+          } else if (drift > 0.1) {
+            const targetRate = currentTime < compensatedTime ? 1.03 : 0.97;
+            if (video.playbackRate !== targetRate) {
+              video.playbackRate = targetRate;
+            }
+          } else {
+            if (video.playbackRate !== 1.0) {
+              video.playbackRate = 1.0;
+            }
+          }
         }
       } else {
-        if (video.playbackRate !== 1.0) {
-          video.playbackRate = 1.0;
+        // Play/pause state MISMATCH between heartbeat and local video.
+        // Only act after 3 consecutive mismatches (~9 seconds) to avoid
+        // stale heartbeats from flipping state. Explicit sync events
+        // (video-play/video-pause/video-seek) handle immediate state changes.
+        consecutiveHeartbeatMismatchRef.current++;
+        if (consecutiveHeartbeatMismatchRef.current >= 3) {
+          consecutiveHeartbeatMismatchRef.current = 0;
+          if (isPlayingNow && video.paused) {
+            expectedProgrammaticPlayRef.current = true;
+            video.play().catch(() => {
+              expectedProgrammaticPlayRef.current = false;
+            });
+          } else if (!isPlayingNow && !video.paused) {
+            expectedProgrammaticPauseRef.current = true;
+            video.pause();
+            video.playbackRate = 1.0;
+          }
         }
-      }
-
-      // Sync play/pause state
-      if (isPlayingNow && video.paused) {
-        expectedProgrammaticPlayRef.current = true;
-        video.play().catch(() => {
-          expectedProgrammaticPlayRef.current = false;
-        });
-      } else if (!isPlayingNow && !video.paused) {
-        expectedProgrammaticPauseRef.current = true;
-        video.pause();
-        video.playbackRate = 1.0;
       }
     });
 
@@ -1965,13 +1994,19 @@ const WatchRoom = () => {
     if (Date.now() < suppressEmitsUntilRef.current) return;
     if (!hasPlaybackControl) return;
 
+    // CRITICAL: Set grace period BEFORE emitting.
+    // This protects the emitter against stale incoming heartbeats from the host.
+    // Without this, the host's heartbeat (sent before the host knew about this action)
+    // would arrive and immediately revert the state, causing glitch loops.
+    lastSyncEventReceivedRef.current = Date.now();
+    suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+    consecutiveHeartbeatMismatchRef.current = 0;
+
     socket.emit(eventName, {
       roomId: resolvedRoomId || roomId,
       time: video.currentTime || 0,
-      clientTimestamp: Date.now() // For race condition prevention
+      clientTimestamp: Date.now()
     });
-
-    console.log(`[EMIT] ${eventName}: time=${video.currentTime.toFixed(2)}s`);
   };
 
 
