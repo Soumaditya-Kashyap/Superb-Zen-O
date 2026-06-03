@@ -516,6 +516,34 @@ const WatchRoom = () => {
     !!normalizeId(currentUserId) && normalizeId(currentUserId) === hostUserId;
   const hasPlaybackControl = canControlPlayback || isRoomHost;
 
+  const shouldSendHeartbeat = useMemo(() => {
+    if (isRoomHost) return true;
+
+    // Check if host is online in the room
+    const isHostOnline = activeUsers.some(u => normalizeId(u.id || u._id) === hostUserId);
+    if (isHostOnline) return false;
+
+    // If host is offline, only the lexicographically smallest user ID among online controllers sends heartbeats
+    if (!hasPlaybackControl) return false;
+
+    const controllersOnline = activeUsers
+      .filter(u => {
+        const uId = normalizeId(u.id || u._id);
+        const uIsHost = uId === hostUserId;
+        const uHasControl = controllerUserIds.includes(uId) || uIsHost;
+        return uHasControl;
+      })
+      .map(u => normalizeId(u.id || u._id))
+      .sort();
+
+    return controllersOnline[0] === normalizeId(currentUserId);
+  }, [isRoomHost, hasPlaybackControl, activeUsers, hostUserId, controllerUserIds, currentUserId]);
+
+  const shouldSendHeartbeatRef = useRef(shouldSendHeartbeat);
+  useEffect(() => {
+    shouldSendHeartbeatRef.current = shouldSendHeartbeat;
+  }, [shouldSendHeartbeat]);
+
   // Detect if room movie is a YouTube stream
   const isYoutubeStream = useMemo(() => {
     const folder = roomData?.movie?.videoFolderName;
@@ -735,7 +763,7 @@ const WatchRoom = () => {
       const socket = socketRef.current;
       const video = videoRef.current?.video;
       
-      if (!socket || !video || !hasPlaybackControl) return;
+      if (!socket || !video || !shouldSendHeartbeatRef.current) return;
       if (isProgrammaticRef.current) return;
       if (Date.now() < suppressEmitsUntilRef.current) return;
 
@@ -1585,6 +1613,11 @@ const WatchRoom = () => {
       const video = videoRef.current?.video;
       if (!video) return;
 
+      // If we are currently the designated master clock source, completely ignore other clients' heartbeats
+      if (shouldSendHeartbeatRef.current) {
+        return;
+      }
+
       const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time || 0);
       const isPlayingNow = !!payload?.isPlaying;
@@ -1746,7 +1779,7 @@ const WatchRoom = () => {
   }, [roomId]);
 
   useEffect(() => {
-    if (hasPlaybackControl) {
+    if (shouldSendHeartbeat) {
       startHeartbeat();
     } else {
       stopHeartbeat();
@@ -1755,7 +1788,7 @@ const WatchRoom = () => {
     return () => {
       stopHeartbeat();
     };
-  }, [hasPlaybackControl, resolvedRoomId, roomId]);
+  }, [shouldSendHeartbeat, resolvedRoomId, roomId]);
 
   // Debug: Log whenever activeUsers changes
   useEffect(() => {
@@ -1920,9 +1953,7 @@ const WatchRoom = () => {
     console.log(`[EMIT] ${eventName}: time=${video.currentTime.toFixed(2)}s`);
   };
 
-  const handleVideoPlay = () => emitVideoSync('video-play');
-  const handleVideoPause = () => emitVideoSync('video-pause');
-  const handleVideoSeeked = () => emitVideoSync('video-seek');
+
 
   // Removed the aggressive timeupdate sync - heartbeat handles it now
 
@@ -2037,9 +2068,6 @@ const WatchRoom = () => {
                 streamUrl={streamUrl}
                 movieTitle={roomData?.movie?.Title || roomData?.name || 'Watch Together'}
                 posterUrl={roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A' ? roomData.movie.Poster : undefined}
-                onPlay={handleVideoPlay}
-                onPause={handleVideoPause}
-                onSeeked={handleVideoSeeked}
                 controlsDisabled={!hasPlaybackControl}
               />
               
