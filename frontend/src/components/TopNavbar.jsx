@@ -64,7 +64,7 @@ const TopNavbar = ({
       if (!token) return;
 
       try {
-        const response = await fetch("http://localhost:5000/api/movies/personalized", {
+        const response = await fetch("window.API_BASE_URL/movies/personalized", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,

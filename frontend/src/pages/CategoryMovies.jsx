@@ -50,14 +50,14 @@ const CategoryMovies = () => {
       }
 
       // Build the API URL based on category type
-      let apiUrl = `http://localhost:5000/api/movies/category/${encodeURIComponent(categoryName)}`;
+      let apiUrl = `window.API_BASE_URL/movies/category/${encodeURIComponent(categoryName)}`;
       apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       
       if (categoryType === 'genre') {
-        apiUrl = `http://localhost:5000/api/movies/genre/${encodeURIComponent(categoryName)}`;
+        apiUrl = `window.API_BASE_URL/movies/genre/${encodeURIComponent(categoryName)}`;
         apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       } else if (categoryType === 'language') {
-        apiUrl = `http://localhost:5000/api/movies/language/${encodeURIComponent(categoryName)}`;
+        apiUrl = `window.API_BASE_URL/movies/language/${encodeURIComponent(categoryName)}`;
         apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       }
 

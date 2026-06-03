@@ -153,7 +153,7 @@ const MoviePlayer = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/movies/favorite', {
+      const response = await fetch('window.API_BASE_URL/movies/favorite', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

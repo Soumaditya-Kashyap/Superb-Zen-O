@@ -34,7 +34,7 @@ const Support = () => {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/support", {
+      const res = await fetch("window.API_BASE_URL/support", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -18,8 +18,8 @@ import {
 import { io } from 'socket.io-client';
 import CreateRoomModal from '../components/CreateRoomModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || window.SOCKET_URL;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.SOCKET_URL;
 
 import { useLocation } from "react-router-dom";   ///////////// by raki
 

@@ -105,7 +105,7 @@ export default function Wish() {
     try {
       setLoading(true);
       // Fetch metadata from backend
-      const response = await axios.get(`http://localhost:5000/api/youtube/video/${id}`);
+      const response = await axios.get(`window.API_BASE_URL/youtube/video/${id}`);
       
       const videoData = { 
         id, 

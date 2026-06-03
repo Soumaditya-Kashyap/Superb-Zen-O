@@ -6,13 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Video, VideoOff, Phone, PhoneOff } from 'lucide-react';
 import HLSVideoPlayer from '../components/HLSVideoPlayer';
 
-const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL ||
-  'http://localhost:5000';
+const getBackendUrl = () => {
+  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || import.meta.env.VITE_SOCKET_URL || window.SOCKET_URL;
+  return url.replace(/\/$/, ''); // Remove trailing slash
+};
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:5000/api';
+const BACKEND_URL = getBackendUrl();
+const SOCKET_URL = BACKEND_URL;
+const API_BASE_URL = BACKEND_URL.endsWith('/api') ? BACKEND_URL : `${BACKEND_URL}/api`;
 
 const CLOUDFRONT_BASE_URL =
   import.meta.env
@@ -140,7 +141,7 @@ const WatchRoom = () => {
 
           const response =
             await fetch(
-              'http://localhost:5000/api/auth/me',
+              `${API_BASE_URL}/auth/me`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,

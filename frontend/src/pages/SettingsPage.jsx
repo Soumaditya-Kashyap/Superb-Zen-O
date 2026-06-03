@@ -39,7 +39,7 @@ const SettingsPage = () => {
 
       // API Request
       const res = await fetch(
-        "http://localhost:5000/api/user/change-password",
+        "window.API_BASE_URL/user/change-password",
         {
           method: "POST",
 

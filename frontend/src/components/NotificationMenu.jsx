@@ -30,8 +30,8 @@ import { io } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import NotificationService from '../services/notificationService';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.SOCKET_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'window.API_BASE_URL';
 
 // Notification type icons and colors
 const notificationConfig = {

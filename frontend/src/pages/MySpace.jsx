@@ -13,7 +13,7 @@ const MySpace = () => {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch('http://localhost:5000/api/auth/me', {
+        const response = await fetch('window.API_BASE_URL/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -46,7 +46,7 @@ const MySpace = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:5000/api/auth/logout', {
+      await fetch('window.API_BASE_URL/auth/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -92,7 +92,7 @@ const MySpace = () => {
       formData.append("image", file);
 
       const response = await fetch(
-        "http://localhost:5000/api/profile/upload-profile",
+        "window.API_BASE_URL/profile/upload-profile",
         {
           method: "POST",
           headers: {

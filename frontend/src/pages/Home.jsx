@@ -134,7 +134,7 @@ const Home = () => {
         }
 
         console.log('🎬 Fetching personalized movies from backend...');
-        const response = await fetch('http://localhost:5000/api/movies/personalized', {
+        const response = await fetch('window.API_BASE_URL/movies/personalized', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

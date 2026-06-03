@@ -164,7 +164,7 @@ const Signup = ({ setIsAuthenticated }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('window.API_BASE_URL/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

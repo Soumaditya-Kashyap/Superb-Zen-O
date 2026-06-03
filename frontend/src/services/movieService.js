@@ -1,4 +1,12 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const getApiBaseUrl = () => {
+  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || window.SOCKET_URL;
+  url = url.replace(/\/$/, ''); // Remove trailing slash
+  if (!url.endsWith('/api')) {
+    url += '/api';
+  }
+  return url;
+};
+const API_BASE_URL = getApiBaseUrl();
 
 class MovieService {
   // Get hero section movies
