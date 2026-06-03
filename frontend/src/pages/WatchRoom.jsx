@@ -6,14 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Video, VideoOff, Phone, PhoneOff } from 'lucide-react';
 import HLSVideoPlayer from '../components/HLSVideoPlayer';
 
-const getBackendUrl = () => {
-  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || import.meta.env.VITE_SOCKET_URL || window.SOCKET_URL;
-  return url.replace(/\/$/, ''); // Remove trailing slash
-};
-
-const BACKEND_URL = getBackendUrl();
-const SOCKET_URL = BACKEND_URL;
-const API_BASE_URL = BACKEND_URL.endsWith('/api') ? BACKEND_URL : `${BACKEND_URL}/api`;
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
 
 const CLOUDFRONT_BASE_URL =
   import.meta.env
@@ -141,7 +134,7 @@ const WatchRoom = () => {
 
           const response =
             await fetch(
-              `${API_BASE_URL}/auth/me`,
+              `${API_URL}/api/auth/me`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
@@ -748,7 +741,7 @@ const WatchRoom = () => {
         setLoadingRoom(true);
 
         const response = await fetch(
-          `${API_BASE_URL}/rooms/${roomId}`,
+          `${API_URL}/api/rooms/${roomId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -864,7 +857,7 @@ const WatchRoom = () => {
       return undefined;
 
     const socket = io(
-      SOCKET_URL,
+      API_URL,
       {
         auth: { token },
         transports: [

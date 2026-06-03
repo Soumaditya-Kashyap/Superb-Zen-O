@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import Footer from "../components/Footer";
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const SettingsPage = () => {
 
   // =====================================================
@@ -39,7 +41,7 @@ const SettingsPage = () => {
 
       // API Request
       const res = await fetch(
-        "window.API_BASE_URL/user/change-password",
+        `${API_URL}/api/user/change-password`,
         {
           method: "POST",
 

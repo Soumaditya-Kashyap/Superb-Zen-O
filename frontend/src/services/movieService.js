@@ -1,5 +1,7 @@
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const getApiBaseUrl = () => {
-  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || window.SOCKET_URL;
+  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || API_URL;
   url = url.replace(/\/$/, ''); // Remove trailing slash
   if (!url.endsWith('/api')) {
     url += '/api';

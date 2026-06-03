@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, Lock, Eye, EyeOff } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const AdminRegister = ({ setIsAdminAuthenticated }) => {
   const navigate = useNavigate();
 
@@ -62,7 +64,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
     }
 
     try {
-      const response = await fetch("window.API_BASE_URL/auth/register", {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

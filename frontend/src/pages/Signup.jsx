@@ -4,6 +4,8 @@ import PropTypes from 'prop-types';
 import {  AnimatePresence , motion } from 'framer-motion';
 import { Mail, Lock, User, Phone, Eye, EyeOff, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const Signup = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
@@ -164,7 +166,7 @@ const Signup = ({ setIsAuthenticated }) => {
     setError('');
 
     try {
-      const response = await fetch('window.API_BASE_URL/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

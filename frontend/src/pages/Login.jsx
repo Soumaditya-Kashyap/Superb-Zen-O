@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const Login = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +28,7 @@ const Login = ({ setIsAuthenticated }) => {
     setError('');
 
     try {
-      const response = await fetch('window.API_BASE_URL/auth/login', {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

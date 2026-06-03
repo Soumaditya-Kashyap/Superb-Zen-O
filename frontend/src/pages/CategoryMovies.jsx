@@ -18,6 +18,8 @@ import MovieCard from '../components/MovieCard';
 import MovieDetails from '../components/MovieDetails';
 import TopNavbar from '../components/TopNavbar';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const CategoryMovies = () => {
   const { categoryName } = useParams();
   const [searchParams] = useSearchParams();
@@ -50,14 +52,14 @@ const CategoryMovies = () => {
       }
 
       // Build the API URL based on category type
-      let apiUrl = `window.API_BASE_URL/movies/category/${encodeURIComponent(categoryName)}`;
+      let apiUrl = `${API_URL}/api/movies/category/${encodeURIComponent(categoryName)}`;
       apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       
       if (categoryType === 'genre') {
-        apiUrl = `window.API_BASE_URL/movies/genre/${encodeURIComponent(categoryName)}`;
+        apiUrl = `${API_URL}/api/movies/genre/${encodeURIComponent(categoryName)}`;
         apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       } else if (categoryType === 'language') {
-        apiUrl = `window.API_BASE_URL/movies/language/${encodeURIComponent(categoryName)}`;
+        apiUrl = `${API_URL}/api/movies/language/${encodeURIComponent(categoryName)}`;
         apiUrl += `?page=${pageNum}&limit=${MOVIES_PER_PAGE}&sort=${sortBy}`;
       }
 

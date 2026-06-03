@@ -18,6 +18,8 @@ import MovieService from '../services/movieService';
 import MovieCard from '../components/MovieCard';
 import HLSVideoPlayer from '../components/HLSVideoPlayer';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 // CloudFront base URL from environment variable
 const CLOUDFRONT_BASE_URL = import.meta.env.VITE_CLOUDFRONT_BASE_URL || 'https://d2k6afcpy0ja0m.cloudfront.net';
 
@@ -153,7 +155,7 @@ const MoviePlayer = () => {
         return;
       }
 
-      const response = await fetch('window.API_BASE_URL/movies/favorite', {
+      const response = await fetch(`${API_URL}/api/movies/favorite`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

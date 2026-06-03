@@ -10,6 +10,8 @@ import {
 import TopNavbar from "../components/TopNavbar";
 import WatchModeModal from "../components/WatchModeModal";
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 export default function Wish() {
   const navigate = useNavigate();
   const iframeRef = useRef(null);
@@ -104,8 +106,7 @@ export default function Wish() {
 
     try {
       setLoading(true);
-      // Fetch metadata from backend
-      const response = await axios.get(`window.API_BASE_URL/youtube/video/${id}`);
+      const response = await axios.get(`${API_URL}/api/youtube/video/${id}`);
       
       const videoData = { 
         id, 

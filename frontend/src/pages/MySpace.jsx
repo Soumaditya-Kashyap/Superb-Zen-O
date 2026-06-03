@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdLogout, MdAccountCircle } from 'react-icons/md';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const MySpace = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || '{}'));
@@ -13,7 +15,7 @@ const MySpace = () => {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch('window.API_BASE_URL/auth/me', {
+        const response = await fetch(`${API_URL}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -46,7 +48,7 @@ const MySpace = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('window.API_BASE_URL/auth/logout', {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -92,7 +94,7 @@ const MySpace = () => {
       formData.append("image", file);
 
       const response = await fetch(
-        "window.API_BASE_URL/profile/upload-profile",
+        `${API_URL}/api/profile/upload-profile`,
         {
           method: "POST",
           headers: {

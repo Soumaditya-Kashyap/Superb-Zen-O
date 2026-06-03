@@ -16,11 +16,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 // Use environment variable or fallback to localhost
 // For testing with teammate, change this to the host machine's IP address
 // e.g., 'http://192.168.1.100:5000' 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.SOCKET_URL;
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'window.API_BASE_URL';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_URL}/api`;
 
 const Chat = () => {
   // View state: 'connect' or 'chat'

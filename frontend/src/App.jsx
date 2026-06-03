@@ -19,15 +19,12 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import About from './components/About';
 
-const getBackendUrl = () => {
-  let url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || window.SOCKET_URL;
-  return url.replace(/\/$/, ''); // Remove trailing slash
-};
-const API_BASE_URL = getBackendUrl().endsWith('/api') ? getBackendUrl() : `${getBackendUrl()}/api`;
 
 import AdminLogin from './admin/AdminLogin';
 import AdminRegister from './admin/AdminRegister';
 import AdminDashboard from './admin/AdminDashboard';
+
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
 
 
 // Protected Route Component
@@ -54,7 +51,7 @@ function AppContent() {
     
     if (token && user) {
       // Verify token with backend
-      fetch(`${API_BASE_URL}/auth/me`, {
+      fetch(`${API_URL}/api/auth/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

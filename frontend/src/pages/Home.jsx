@@ -19,6 +19,8 @@ import MovieDetails from '../components/MovieDetails';
 import WatchModeModal from '../components/WatchModeModal';
 import TopNavbar from '../components/TopNavbar';
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 
 
 
@@ -134,7 +136,7 @@ const Home = () => {
         }
 
         console.log('🎬 Fetching personalized movies from backend...');
-        const response = await fetch('window.API_BASE_URL/movies/personalized', {
+        const response = await fetch(`${API_URL}/api/movies/personalized`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

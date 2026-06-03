@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import MovieService from "../services/movieService";
 import NotificationMenu from "./NotificationMenu";
 
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 const TopNavbar = ({
   showBackButton = false,
   onFilterChange,
@@ -64,7 +66,7 @@ const TopNavbar = ({
       if (!token) return;
 
       try {
-        const response = await fetch("window.API_BASE_URL/movies/personalized", {
+        const response = await fetch(`${API_URL}/api/movies/personalized`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,

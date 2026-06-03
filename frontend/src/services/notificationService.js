@@ -1,9 +1,11 @@
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
+
 /**
  * Notification Service
  * Handles API calls for the notification system
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'window.API_BASE_URL';
+const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_URL}/api`;
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
