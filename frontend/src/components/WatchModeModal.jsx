@@ -82,9 +82,6 @@ const WatchModeModal = ({ isOpen, onClose, onSelectMode, movieTitle }) => {
                   <p className="text-white/60 text-sm">Watch with friends in sync</p>
                 </div>
               </div>
-              <div className="mt-3 px-3 py-1.5 bg-blue-500/20 rounded-full border border-blue-500/30 inline-block">
-                <span className="text-blue-400 text-xs font-semibold">Coming Soon</span>
-              </div>
             </motion.button>
           </div>
         </motion.div>

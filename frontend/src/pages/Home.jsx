@@ -296,8 +296,18 @@ const Home = () => {
     setShowHeroWatchModal(false);
     if (mode === 'alone' && selectedHeroMovie) {
       navigate(`/player/${selectedHeroMovie.imdbID}`);
-    } else {
-      alert('Watch Together feature coming soon!');
+    } else if (selectedHeroMovie) {
+      const moviePayload = {
+        imdbID: selectedHeroMovie.imdbID,
+        Title: selectedHeroMovie.title,
+        Poster: selectedHeroMovie.image,
+        videoFolderName: selectedHeroMovie.imdbID
+      };
+      navigate('/watch-together', {
+        state: {
+          youtubeMovie: moviePayload
+        }
+      });
     }
   };
 

@@ -28,6 +28,8 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   const progressBarRef = useRef(null);
   const controlsRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+  const isPlayerReadyRef = useRef(false);
   const [showNoAccessToast, setShowNoAccessToast] = useState(false);
   const toastTimeoutRef = useRef(null);
   const bufferTimeoutRef = useRef(null);
@@ -59,17 +61,145 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   const [buffering, setBuffering] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
 
+  const isYoutube = useMemo(() => streamUrl && streamUrl.includes('/yt_'), [streamUrl]);
+  const youtubeId = useMemo(() => {
+    if (!isYoutube) return null;
+    try {
+      return streamUrl.split('/yt_')[1].split('/')[0];
+    } catch {
+      return null;
+    }
+  }, [isYoutube, streamUrl]);
+
+  const ytPlayerInstanceRef = useRef(null);
+  const listenersRef = useRef({
+    play: [],
+    pause: [],
+    seeked: [],
+    timeupdate: [],
+    waiting: [],
+    canplay: [],
+    durationchange: []
+  });
+
+  const [ytPlayer, setYtPlayer] = useState(null);
+
+  const mockedVideoElement = useMemo(() => {
+    if (!isYoutube) return null;
+
+    return {
+      get listeners() {
+        return listenersRef.current;
+      },
+      get currentTime() {
+        return (ytPlayerInstanceRef.current && isPlayerReadyRef.current) ? ytPlayerInstanceRef.current.getCurrentTime() : 0;
+      },
+      set currentTime(value) {
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            ytPlayerInstanceRef.current.seekTo(value, true);
+            listenersRef.current.seeked.forEach(cb => cb());
+          } catch (e) {}
+        }
+      },
+      get paused() {
+        if (!ytPlayerInstanceRef.current || !isPlayerReadyRef.current) return true;
+        try {
+          return ytPlayerInstanceRef.current.getPlayerState() !== 1;
+        } catch {
+          return true;
+        }
+      },
+      get playbackRate() {
+        return (ytPlayerInstanceRef.current && isPlayerReadyRef.current) ? ytPlayerInstanceRef.current.getPlaybackRate() : 1.0;
+      },
+      set playbackRate(value) {
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            ytPlayerInstanceRef.current.setPlaybackRate(value);
+          } catch (e) {}
+        }
+      },
+      get duration() {
+        return (ytPlayerInstanceRef.current && isPlayerReadyRef.current) ? ytPlayerInstanceRef.current.getDuration() : 0;
+      },
+      get readyState() {
+        return 4;
+      },
+      get volume() {
+        return (ytPlayerInstanceRef.current && isPlayerReadyRef.current) ? ytPlayerInstanceRef.current.getVolume() / 100 : 0.4;
+      },
+      set volume(value) {
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            ytPlayerInstanceRef.current.setVolume(value * 100);
+          } catch (e) {}
+        }
+      },
+      get muted() {
+        return (ytPlayerInstanceRef.current && isPlayerReadyRef.current) ? ytPlayerInstanceRef.current.isMuted() : false;
+      },
+      set muted(value) {
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            if (value) ytPlayerInstanceRef.current.mute();
+            else ytPlayerInstanceRef.current.unMute();
+          } catch (e) {}
+        }
+      },
+      play() {
+        console.log('[mockedVideoElement] play() called. ytPlayerInstance:', !!ytPlayerInstanceRef.current, 'isReady:', isPlayerReadyRef.current);
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            ytPlayerInstanceRef.current.playVideo();
+          } catch (e) {
+            console.error('[mockedVideoElement] playVideo error:', e);
+          }
+        }
+        return Promise.resolve();
+      },
+      pause() {
+        console.log('[mockedVideoElement] pause() called. ytPlayerInstance:', !!ytPlayerInstanceRef.current, 'isReady:', isPlayerReadyRef.current);
+        if (ytPlayerInstanceRef.current && isPlayerReadyRef.current) {
+          try {
+            ytPlayerInstanceRef.current.pauseVideo();
+          } catch (e) {
+            console.error('[mockedVideoElement] pauseVideo error:', e);
+          }
+        }
+      },
+      addEventListener(event, callback) {
+        if (listenersRef.current[event]) {
+          listenersRef.current[event].push(callback);
+        }
+      },
+      removeEventListener(event, callback) {
+        if (listenersRef.current[event]) {
+          listenersRef.current[event] = listenersRef.current[event].filter(cb => cb !== callback);
+        }
+      },
+      canPlayType(type) {
+        return '';
+      }
+    };
+  }, [isYoutube]);
+
+  const getActiveVideo = useCallback(() => {
+    return isYoutube ? mockedVideoElement : videoRef.current;
+  }, [isYoutube, mockedVideoElement]);
+
   // Expose video ref to parent component
   useImperativeHandle(ref, () => ({
     get video() {
-      return videoRef.current;
+      return isYoutube ? mockedVideoElement : videoRef.current;
     },
     get hls() {
       return hlsRef.current;
     }
-  }), []); // Empty deps - refs are stable
+  }), [isYoutube, mockedVideoElement]);
 
   useEffect(() => {
+    if (isYoutube) return undefined;
     const video = videoRef.current;
     if (!video || !streamUrl) return;
 
@@ -194,8 +324,145 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
     };
   }, [streamUrl]);
 
+  useEffect(() => {
+    if (!isYoutube || !youtubeId) return undefined;
+
+    let playerInstance = null;
+    let isDestroyed = false;
+
+    const initPlayer = () => {
+      if (isDestroyed) return;
+      if (!ytPlayerRef.current) {
+        console.log('[YOUTUBE PLAYER] Iframe element not ready yet, retrying in 50ms...');
+        setTimeout(initPlayer, 50);
+        return;
+      }
+      
+      console.log('[YOUTUBE PLAYER] Initializing YT.Player on placeholder div:', ytPlayerRef.current.id);
+      playerInstance = new window.YT.Player(ytPlayerRef.current, {
+        videoId: youtubeId,
+        playerVars: {
+          enablejsapi: 1,
+          controls: 1,
+          modestbranding: 1,
+          rel: 0,
+          iv_load_policy: 3,
+          autoplay: 0,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: (event) => {
+            if (isDestroyed) return;
+            console.log('[YOUTUBE PLAYER] Ready event fired! Setting ready ref to true.');
+            isPlayerReadyRef.current = true;
+            ytPlayerInstanceRef.current = playerInstance;
+            setYtPlayer(playerInstance);
+            setIsLoading(false);
+            setBuffering(false);
+            
+            try {
+              playerInstance.setVolume(volume * 100);
+              if (isMuted) {
+                playerInstance.mute();
+              } else {
+                playerInstance.unMute();
+              }
+            } catch (e) {}
+
+            if (listenersRef.current.canplay) {
+              listenersRef.current.canplay.forEach(cb => cb());
+            }
+            if (listenersRef.current.durationchange) {
+              listenersRef.current.durationchange.forEach(cb => cb());
+            }
+          },
+          onStateChange: (event) => {
+            if (isDestroyed) return;
+            console.log('[YOUTUBE PLAYER] State change event fired:', event.data);
+            const state = event.data;
+            if (state === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true);
+              setBuffering(false);
+              listenersRef.current.play.forEach(cb => cb());
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              setIsPlaying(false);
+              setBuffering(false);
+              listenersRef.current.pause.forEach(cb => cb());
+            } else if (state === window.YT.PlayerState.BUFFERING) {
+              setBuffering(true);
+              listenersRef.current.waiting.forEach(cb => cb());
+            } else if (state === window.YT.PlayerState.ENDED) {
+              setIsPlaying(false);
+              setBuffering(false);
+              listenersRef.current.pause.forEach(cb => cb());
+            }
+          },
+          onError: (event) => {
+            if (isDestroyed) return;
+            console.error('[YOUTUBE PLAYER] Error event fired:', event.data);
+            setError(`YouTube Player Error: ${event.data}. The video might be restricted or embedding is disabled.`);
+          }
+        }
+      });
+      setIsLoading(false);
+    };
+
+    if (window.YT && window.YT.Player) {
+      initPlayer();
+    } else {
+      if (!window.onYouTubeIframeAPIReady) {
+        window.onYouTubeIframeAPIReady = () => {
+          initPlayer();
+        };
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        const interval = setInterval(() => {
+          if (window.YT && window.YT.Player) {
+            clearInterval(interval);
+            initPlayer();
+          }
+        }, 100);
+      }
+    }
+
+    return () => {
+      isDestroyed = true;
+      isPlayerReadyRef.current = false;
+      ytPlayerInstanceRef.current = null;
+      if (playerInstance) {
+        try {
+          playerInstance.destroy();
+        } catch (e) {}
+      }
+    };
+  }, [isYoutube, youtubeId]);
+
+  useEffect(() => {
+    if (!isYoutube || !ytPlayer) return undefined;
+
+    const interval = setInterval(() => {
+      try {
+        const current = ytPlayer.getCurrentTime();
+        const dur = ytPlayer.getDuration();
+        setCurrentTime(current);
+        setDuration(dur);
+        setIsPlaying(ytPlayer.getPlayerState() === window.YT.PlayerState.PLAYING);
+        
+        if (ytPlayer.getPlayerState() === window.YT.PlayerState.PLAYING) {
+          listenersRef.current.timeupdate.forEach(cb => cb());
+        }
+      } catch (err) {}
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [isYoutube, ytPlayer]);
+
   // Video event listeners
   useEffect(() => {
+    if (isYoutube) return undefined;
     const video = videoRef.current;
     if (!video) return;
 
@@ -266,10 +533,11 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   }, [onPlay, onPause, onSeeked, controlsDisabled]);
   // Sync video element volume with state
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = volume;
+    const video = getActiveVideo();
+    if (video) {
+      video.volume = volume;
     }
-  }, [volume]);
+  }, [volume, getActiveVideo]);
 
   // Controls visibility - keep visible when hovering
   const handleMouseMove = useCallback(() => {
@@ -316,37 +584,44 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   }, [isPlaying]);
 
   const togglePlay = useCallback(() => {
+    console.log('[HLSVideoPlayer] togglePlay clicked. controlsDisabled:', controlsDisabled);
     if (controlsDisabled) {
       triggerNoAccessToast();
       return;
     }
-    const video = videoRef.current;
-    if (!video) return;
+    const video = getActiveVideo();
+    if (!video) {
+      console.warn('[HLSVideoPlayer] togglePlay failed: no active video element');
+      return;
+    }
     
+    console.log('[HLSVideoPlayer] togglePlay: video.paused is', video.paused);
     if (video.paused) {
-      video.play().catch((err) => console.warn('Play prevented:', err.message));
+      console.log('[HLSVideoPlayer] togglePlay: calling video.play()');
+      video.play().catch((err) => console.warn('[HLSVideoPlayer] Play prevented:', err.message));
     } else {
+      console.log('[HLSVideoPlayer] togglePlay: calling video.pause()');
       video.pause();
     }
-  }, [controlsDisabled, triggerNoAccessToast]);
+  }, [controlsDisabled, triggerNoAccessToast, getActiveVideo]);
 
   const toggleMute = useCallback(() => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     
     video.muted = !video.muted;
     setIsMuted(video.muted);
-  }, []);
+  }, [getActiveVideo]);
 
   const handleVolumeChange = useCallback((e) => {
     const newVolume = parseFloat(e.target.value);
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     
     video.volume = newVolume;
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
-  }, []);
+  }, [getActiveVideo]);
 
   const handleProgressClick = useCallback((e) => {
     if (!progressBarRef.current) return;
@@ -355,20 +630,20 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
     const pos = (e.clientX - rect.left) / rect.width;
     const newTime = pos * duration;
     
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     
     setBuffering(true);
     video.currentTime = newTime;
-  }, [duration]);
+  }, [duration, getActiveVideo]);
 
   const skip = useCallback((seconds) => {
-    const video = videoRef.current;
+    const video = getActiveVideo();
     if (!video) return;
     
     setBuffering(true);
     video.currentTime += seconds;
-  }, []);
+  }, [getActiveVideo]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -383,10 +658,10 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
   }, []);
 
   const changeQuality = useCallback((qualityIndex) => {
-    if (!hlsRef.current || !videoRef.current) return;
+    const video = getActiveVideo();
+    if (isYoutube || !hlsRef.current || !video) return;
     
     const hls = hlsRef.current;
-    const video = videoRef.current;
     const wasPlaying = !video.paused;
     const currentTimeBeforeSwitch = video.currentTime;
     
@@ -449,13 +724,34 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
       }}
     >
       {/* Video Element */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-contain"
-        poster={posterUrl}
-        onClick={togglePlay}
-        playsInline
-      />
+      {isYoutube ? (
+        <div className="w-full h-full relative">
+          <div 
+            ref={ytPlayerRef} 
+            id={`yt-player-${youtubeId}`}
+            className="w-full h-full" 
+          />
+          {/* Transparent overlay blocks native YouTube controls when access is restricted */}
+          {controlsDisabled && (
+            <div
+              className="absolute inset-0 z-10 cursor-not-allowed"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerNoAccessToast();
+              }}
+            />
+          )}
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          className="w-full h-full object-contain"
+          poster={posterUrl}
+          onClick={togglePlay}
+          playsInline
+        />
+      )}
 
       {/* Loading Overlay */}
       {(isLoading || buffering) && (
@@ -504,8 +800,8 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
         </div>
       )}
 
-      {/* Play Button Overlay */}
-      {!isPlaying && !isLoading && (
+      {/* Play Button Overlay - shown for HLS only; YouTube iframe handles its own play button */}
+      {!isPlaying && !isLoading && !isYoutube && (
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -524,7 +820,7 @@ const HLSVideoPlayer = forwardRef(({ streamUrl, posterUrl, onPlay, onPause, onSe
 
       {/* Controls */}
 <AnimatePresence>
-  {showControls && !isLoading && !controlsDisabled && (
+  {showControls && !isLoading && !controlsDisabled && !isYoutube && (
     <motion.div
       ref={controlsRef}
       initial={{ opacity: 0, y: 20 }}

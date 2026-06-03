@@ -107,13 +107,27 @@ export default function Wish() {
       // Fetch metadata from backend
       const response = await axios.get(`http://localhost:5000/api/youtube/video/${id}`);
       
-      setTempVideoData({ 
+      const videoData = { 
         id, 
         title: response.data.title, 
         url: response.data.embedUrl 
+      };
+
+      navigate("/watch-together", {
+        state: {
+          youtubeMovie: {
+            _id: `yt_${videoData.id}`,
+            Title: videoData.title,
+            Poster: `https://i.ytimg.com/vi/${videoData.id}/hqdefault.jpg`,
+            youtubeId: videoData.id,
+            isYoutube: true,
+            embedUrl: videoData.url,
+            Runtime: "Live Stream",
+            Genre: "YouTube Video",
+            Year: new Date().getFullYear().toString()
+          }
+        }
       });
-      
-      setIsModalOpen(true); // Open the Together/Alone choice modal
     } catch (err) {
       console.error(err);
       alert("Failed to load video info.");
@@ -123,62 +137,11 @@ export default function Wish() {
   };
 
   // =========================================
-  // MODAL CHOICE HANDLER
-  // =========================================
-  const handleConfirmMode = async (watchChoice) => {
-    setIsModalOpen(false);
-
-    // OPTION A: WATCH TOGETHER
-    if (watchChoice === "together") {
-      return navigate("/watch-together", {
-        state: {
-          youtubeMovie: {
-            _id: `yt_${tempVideoData.id}`,
-            Title: tempVideoData.title,
-            Poster: `https://i.ytimg.com/vi/${tempVideoData.id}/hqdefault.jpg`,
-            youtubeId: tempVideoData.id,
-            isYoutube: true,
-            embedUrl: tempVideoData.url,
-            Runtime: "Live Stream",
-            Genre: "YouTube Video",
-            Year: new Date().getFullYear().toString()
-          }
-        }
-      });
-    }
-
-    // OPTION B: WATCH ALONE (LOAD PLAYER LOCALLY)
-    setYoutubeEmbedUrl(tempVideoData.url);
-    setMovieTitle(tempVideoData.title);
-    setIsPlaying(true);
-
-    // Track analytics
-    try {
-      await axios.post("http://localhost:5000/api/player/play", {
-        videoId: tempVideoData.id,
-        title: tempVideoData.title,
-        source: "youtube",
-        watchMode: watchChoice
-      });
-    } catch (e) {
-      console.error("Analytics error", e);
-    }
-  };
-
-  // =========================================
   // RENDER
   // =========================================
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-yellow-500/30">
       <TopNavbar showBackButton={false} />
-
-      {/* Choice Modal */}
-      <WatchModeModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        movieTitle={tempVideoData?.title || "this video"}
-        onSelectMode={handleConfirmMode}
-      />
 
       <main className="pt-32 px-6 max-w-7xl mx-auto">
         <AnimatePresence mode="wait">

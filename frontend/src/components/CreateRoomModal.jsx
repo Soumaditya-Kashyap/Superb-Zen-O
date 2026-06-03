@@ -56,6 +56,13 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated,youtubeMovie }) => {
     }
   }, [step]);
 
+  useEffect(() => {
+    if (isOpen && youtubeMovie) {
+      setSelectedMovie(youtubeMovie);
+      setStep(2);
+    }
+  }, [isOpen, youtubeMovie]);
+
   const fetchMovies = async (search = '') => {
     try {
       setMoviesLoading(true);
@@ -156,6 +163,8 @@ const CreateRoomModal = ({ isOpen, onClose, onRoomCreated,youtubeMovie }) => {
         },
         body: JSON.stringify({
           movieId: selectedMovie._id,
+          movieTitle: selectedMovie.Title,
+          moviePoster: selectedMovie.Poster,
           invitedFriends: selectedFriends
         })
       });

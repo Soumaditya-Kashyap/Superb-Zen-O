@@ -55,6 +55,7 @@ const WatchRoom = () => {
   const [inCall, setInCall] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isCameraOff, setIsCameraOff] = useState(true);
+  const [isHandRaised, setIsHandRaised] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState({});
 
@@ -210,11 +211,40 @@ const WatchRoom = () => {
     !!normalizeId(currentUserId) && normalizeId(currentUserId) === hostUserId;
   const hasPlaybackControl = canControlPlayback || isRoomHost;
 
+  // Detect if room movie is a YouTube stream
+  const isYoutubeStream = useMemo(() => {
+    const folder = roomData?.movie?.videoFolderName;
+    return folder && folder.startsWith('yt_');
+  }, [roomData?.movie?.videoFolderName]);
+
+  // Extract current YouTube video ID from folder name — used as React key to force remount on video change
+  const currentYtVideoId = useMemo(() => {
+    const folder = roomData?.movie?.videoFolderName;
+    if (!folder || !folder.startsWith('yt_')) return null;
+    return folder.replace('yt_', '');
+  }, [roomData?.movie?.videoFolderName]);
+
+
+
+  // Compute the stream URL for the player
+  const streamUrl = useMemo(() => {
+    const folder = roomData?.movie?.videoFolderName;
+    if (!folder) return SAMPLE_VIDEO_URL;
+    if (folder.startsWith('yt_')) {
+      // For YouTube: encode as yt_VIDEOID so HLSVideoPlayer can detect it
+      // The CLOUDFRONT_BASE_URL path with yt_ prefix triggers isYoutube in the player
+      return `${CLOUDFRONT_BASE_URL}/${folder}/master.m3u8`;
+    }
+    return `${CLOUDFRONT_BASE_URL}/${folder}/master.m3u8`;
+  }, [roomData?.movie?.videoFolderName]);
+
+
   // Direct Video Element Sync Event Listeners (Bypasses components barriers)
   useEffect(() => {
     if (!videoElement) return undefined;
 
     const onLocalPlay = () => {
+      console.log('[WatchRoom] onLocalPlay triggered. expectedProgrammaticPlay:', expectedProgrammaticPlayRef.current, 'hasPlaybackControl:', hasPlaybackControl);
       if (expectedProgrammaticPlayRef.current) {
         expectedProgrammaticPlayRef.current = false;
         return;
@@ -225,6 +255,7 @@ const WatchRoom = () => {
     };
 
     const onLocalPause = () => {
+      console.log('[WatchRoom] onLocalPause triggered. expectedProgrammaticPause:', expectedProgrammaticPauseRef.current, 'hasPlaybackControl:', hasPlaybackControl);
       if (expectedProgrammaticPauseRef.current) {
         expectedProgrammaticPauseRef.current = false;
         return;
@@ -235,6 +266,7 @@ const WatchRoom = () => {
     };
 
     const onLocalSeeked = () => {
+      console.log('[WatchRoom] onLocalSeeked triggered. expectedProgrammaticSeek:', expectedProgrammaticSeekTimeRef.current, 'hasPlaybackControl:', hasPlaybackControl);
       if (expectedProgrammaticSeekTimeRef.current !== null) {
         const diff = Math.abs(videoElement.currentTime - expectedProgrammaticSeekTimeRef.current);
         if (diff < 0.5) {
@@ -546,7 +578,8 @@ const WatchRoom = () => {
           roomId: resolvedRoomId || roomId,
           inCall: true,
           isMuted,
-          isCameraOff
+          isCameraOff,
+          isHandRaised: false
         });
       }
     } catch (err) {
@@ -557,13 +590,15 @@ const WatchRoom = () => {
 
   const leaveVideoCall = () => {
     setInCall(false);
+    setIsHandRaised(false);
     cleanupAllConnections();
     if (socketRef.current) {
       socketRef.current.emit('call:state-change', {
         roomId: resolvedRoomId || roomId,
         inCall: false,
         isMuted: true,
-        isCameraOff: true
+        isCameraOff: true,
+        isHandRaised: false
       });
     }
   };
@@ -580,7 +615,8 @@ const WatchRoom = () => {
         roomId: resolvedRoomId || roomId,
         inCall: true,
         isMuted: nextMute,
-        isCameraOff
+        isCameraOff,
+        isHandRaised
       });
     }
   };
@@ -597,8 +633,43 @@ const WatchRoom = () => {
         roomId: resolvedRoomId || roomId,
         inCall: true,
         isMuted,
-        isCameraOff: nextCameraOff
+        isCameraOff: nextCameraOff,
+        isHandRaised
       });
+    }
+  };
+
+  const toggleHand = () => {
+    const nextHand = !isHandRaised;
+    setIsHandRaised(nextHand);
+    if (socketRef.current) {
+      socketRef.current.emit('call:state-change', {
+        roomId: resolvedRoomId || roomId,
+        inCall,
+        isMuted,
+        isCameraOff,
+        isHandRaised: nextHand
+      });
+    }
+
+    if (nextHand) {
+      setTimeout(() => {
+        setIsHandRaised(prev => {
+          if (prev) {
+            if (socketRef.current) {
+              socketRef.current.emit('call:state-change', {
+                roomId: resolvedRoomId || roomId,
+                inCall,
+                isMuted,
+                isCameraOff,
+                isHandRaised: false
+              });
+            }
+            return false;
+          }
+          return prev;
+        });
+      }, 6000);
     }
   };
 
@@ -724,6 +795,9 @@ const WatchRoom = () => {
     if (!video) return undefined;
 
     const folder = roomData?.movie?.videoFolderName;
+    const isYoutube = folder && folder.startsWith('yt_');
+    if (isYoutube) return undefined;
+
     const hlsUrl = folder ? `${CLOUDFRONT_BASE_URL}/${folder}/master.m3u8` : null;
 
     // Cleanup any previous HLS instance
@@ -947,6 +1021,22 @@ const WatchRoom = () => {
       });
     });
 
+    socket.on('watch:change-source', (payload) => {
+      console.log('[WATCH ROOM] Source changed:', payload);
+      const { youtubeVideoId } = payload;
+      if (!youtubeVideoId) return;
+      setRoomData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          movie: {
+            ...(prev.movie || {}),
+            videoFolderName: `yt_${youtubeVideoId}`,
+          }
+        };
+      });
+    });
+
     socket.on('watch:message:received', (payload) => {
       const incomingMessage = payload?.message;
       if (!incomingMessage?._id) return;
@@ -956,6 +1046,26 @@ const WatchRoom = () => {
         if (exists) return prev;
         return [...prev, incomingMessage];
       });
+
+      const senderId = incomingMessage.sender?.id || incomingMessage.sender?._id || incomingMessage.sender;
+      const senderName = incomingMessage.sender
+        ? (normalizeId(senderId) === normalizeId(currentUserId)
+          ? 'You'
+          : (incomingMessage.sender.nickName || incomingMessage.sender.name || 'User'))
+        : 'User';
+
+      const newId = incomingMessage._id || Math.random().toString();
+      const newFloatingMsg = {
+        id: newId,
+        sender: senderName,
+        content: incomingMessage.content,
+      };
+
+      setFloatingMessages((prev) => [...prev, newFloatingMsg]);
+
+      setTimeout(() => {
+        setFloatingMessages((prev) => prev.filter((msg) => msg.id !== newId));
+      }, 3000);
     });
 
     /**
@@ -1515,12 +1625,9 @@ const WatchRoom = () => {
           <div className="flex-1 flex flex-col gap-3 min-w-0">
             <section className="flex-1 relative rounded-3xl overflow-hidden border border-white/10 bg-black min-h-0">
               <HLSVideoPlayer
+                key={currentYtVideoId || 'hls'}
                 ref={playerRefCallback}
-                streamUrl={
-                  roomData?.movie?.videoFolderName
-                    ? `${CLOUDFRONT_BASE_URL}/${roomData.movie.videoFolderName}/master.m3u8`
-                    : SAMPLE_VIDEO_URL
-                }
+                streamUrl={streamUrl}
                 movieTitle={roomData?.movie?.Title || roomData?.name || 'Watch Together'}
                 posterUrl={roomData?.movie?.Poster && roomData.movie.Poster !== 'N/A' ? roomData.movie.Poster : undefined}
                 onPlay={handleVideoPlay}
@@ -1549,10 +1656,10 @@ const WatchRoom = () => {
                   {floatingMessages.map((msg) => (
                     <motion.div
                       key={msg.id}
-                      initial={{ opacity: 0, y: 50, scale: 0.8 }}
+                      initial={{ opacity: 0, y: 100, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -50 }}
-                      transition={{ duration: 4, ease: 'easeOut' }}
+                      exit={{ opacity: 0, y: -250, scale: 0.95 }}
+                      transition={{ duration: 0.4, ease: 'easeInOut' }}
                       className="max-w-sm rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3 shadow-2xl"
                     >
                       <p className="text-gold text-xs font-bold mb-1">{msg.sender}</p>
@@ -1564,46 +1671,7 @@ const WatchRoom = () => {
             </section>
 
             <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold">Video Call:</span>
-                {inCall ? (
-                  <>
-                    <button
-                      onClick={toggleMute}
-                      className={`p-2 rounded-xl transition-all ${
-                        isMuted ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
-                      }`}
-                      title={isMuted ? "Unmute Mic" : "Mute Mic"}
-                    >
-                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </button>
-                    <button
-                      onClick={toggleCamera}
-                      className={`p-2 rounded-xl transition-all ${
-                        isCameraOff ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
-                      }`}
-                      title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-                    >
-                      {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                    </button>
-                    <button
-                      onClick={leaveVideoCall}
-                      className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 transition-all flex items-center gap-2 text-sm"
-                    >
-                      <PhoneOff className="w-4 h-4" /> Leave Call
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={joinVideoCall}
-                    className="px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/30 text-green-300 hover:bg-green-500/20 transition-all flex items-center gap-2 text-sm"
-                  >
-                    <Phone className="w-4 h-4" /> Join Video Call
-                  </button>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+              <div className="flex items-center gap-2 flex-1">
                 <input
                   type="text"
                   placeholder="Type a message..."
@@ -1615,7 +1683,7 @@ const WatchRoom = () => {
                 <button
                   onClick={handleSendMessage}
                   disabled={!chatInput.trim() || chatSending}
-                  className="px-4 py-1.5 rounded-xl bg-gold text-black text-sm font-semibold hover:bg-gold-light transition"
+                  className="px-5 py-1.5 rounded-xl bg-gold text-black text-sm font-semibold hover:bg-gold-light transition shrink-0"
                 >
                   Send
                 </button>
@@ -1630,9 +1698,9 @@ const WatchRoom = () => {
                 animate={{ x: 0 }}
                 exit={{ x: 320 }}
                 transition={{ duration: 0.3 }}
-                className="w-[290px] rounded-3xl border border-white/10 bg-black/30 backdrop-blur-2xl p-4 overflow-y-auto shrink-0"
+                className="w-[290px] rounded-3xl border border-white/10 bg-black/30 backdrop-blur-2xl p-4 flex flex-col shrink-0 min-h-0"
               >
-                <div className="flex flex-col gap-2 mb-5 pb-3 border-b border-white/10">
+                <div className="flex flex-col gap-2 mb-5 pb-3 border-b border-white/10 shrink-0">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-bold">Participants</h2>
                     <span className="text-xs text-white/50">{activeUsers.length} online</span>
@@ -1666,25 +1734,33 @@ const WatchRoom = () => {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="flex-1 flex flex-col gap-3 overflow-y-auto min-h-0 pr-1">
                   {activeUsers.map((participant, index) => {
                     const pId = normalizeId(participant.id || participant._id);
                     const isSelf = isCurrentUser(participant);
                     const hasVideo = isSelf ? (inCall && !isCameraOff && localStream) : (participant.inCall && !participant.isCameraOff && remoteStreams[pId]);
                     const isMutedState = isSelf ? isMuted : participant.isMuted;
+                    const isHandRaisedState = isSelf ? isHandRaised : participant.isHandRaised;
 
                     return (
                       <div
                         key={pId || index}
                         className="w-full aspect-video rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-3 relative overflow-hidden"
                       >
+                        {/* Bouncing Hand-Raised Badge */}
+                        {isHandRaisedState && (
+                          <div className="absolute top-2 right-2 z-30 bg-gold text-black text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-lg font-bold">
+                            ✋
+                          </div>
+                        )}
+
                         {hasVideo ? (
                           <div className="absolute inset-0 w-full h-full bg-black z-0">
                             <video
                               ref={el => {
-                                if (el) {
-                                  el.srcObject = isSelf ? localStream : remoteStreams[pId];
-                                }
+                                  if (el) {
+                                    el.srcObject = isSelf ? localStream : remoteStreams[pId];
+                                  }
                               }}
                               autoPlay
                               playsInline
@@ -1703,6 +1779,20 @@ const WatchRoom = () => {
                           </div>
                         ) : (
                           <>
+                            {/* Render hidden audio element so remote voice is always heard even when camera is off */}
+                            {!isSelf && participant.inCall && remoteStreams[pId] && (
+                              <audio
+                                ref={el => {
+                                  if (el) {
+                                    el.srcObject = remoteStreams[pId];
+                                  }
+                                }}
+                                autoPlay
+                                playsInline
+                                className="hidden"
+                              />
+                            )}
+
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-1 border border-white/10 shrink-0 relative">
                               {isSelf && currentUser?.profilePicture ? (
                                 <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
@@ -1766,6 +1856,56 @@ const WatchRoom = () => {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Sidebar Call Control Panel */}
+                <div className="mt-5 pt-3 border-t border-white/10 flex flex-col gap-2">
+                  <span className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">Video Call Controls</span>
+                  {inCall ? (
+                    <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl border border-white/5 gap-2">
+                      <button
+                        onClick={toggleMute}
+                        className={`p-2 rounded-xl transition-all flex-1 flex justify-center ${
+                          isMuted ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                        }`}
+                        title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                      >
+                        {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={toggleCamera}
+                        className={`p-2 rounded-xl transition-all flex-1 flex justify-center ${
+                          isCameraOff ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-green-500/20 text-green-300 border border-green-500/30'
+                        }`}
+                        title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
+                      >
+                        {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                      </button>
+                      <button
+                        onClick={toggleHand}
+                        className={`p-2 rounded-xl transition-all flex-1 flex justify-center text-sm ${
+                          isHandRaised ? 'bg-gold/30 text-gold border border-gold/40' : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                        }`}
+                        title={isHandRaised ? "Lower Hand" : "Raise Hand"}
+                      >
+                        ✋
+                      </button>
+                      <button
+                        onClick={leaveVideoCall}
+                        className="p-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition-all flex-1 flex justify-center"
+                        title="Leave Video Call"
+                      >
+                        <PhoneOff className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={joinVideoCall}
+                      className="w-full py-2 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-300 hover:bg-green-500/20 transition-all flex items-center justify-center gap-2 text-xs font-semibold"
+                    >
+                      <Phone className="w-4 h-4" /> Join Video Call
+                    </button>
+                  )}
                 </div>
               </motion.aside>
             )}

@@ -46,8 +46,12 @@ const MovieDetails = ({ imdbId, onClose }) => {
     setShowWatchModal(false);
     if (mode === 'alone') {
       navigate(`/player/${imdbId}`);
-    } else {
-      alert('Watch Together feature coming soon!');
+    } else if (movie) {
+      navigate('/watch-together', {
+        state: {
+          youtubeMovie: movie
+        }
+      });
     }
   };
 

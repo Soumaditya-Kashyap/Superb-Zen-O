@@ -485,6 +485,76 @@ function initializeSocket(httpServer) {
         });
 
         /**
+         * Host changes the YouTube source for all users in the room
+         */
+        socket.on('watch:change-source', async (data = {}) => {
+            const { roomId, youtubeVideoId } = data;
+            console.log(`[SOCKET] watch:change-source request received - roomId: ${roomId}, youtubeVideoId: ${youtubeVideoId}`);
+
+            try {
+                if (!roomId || !youtubeVideoId) {
+                    console.log('[SOCKET] Change source rejected: missing roomId or youtubeVideoId');
+                    return;
+                }
+
+                let watchRoom = null;
+                if (/^[a-fA-F0-9]{24}$/.test(roomId)) {
+                    watchRoom = await WatchRoom.findById(roomId);
+                }
+                if (!watchRoom) {
+                    watchRoom = await WatchRoom.findOne({ inviteCode: roomId });
+                }
+                if (!watchRoom) {
+                    console.log('[SOCKET] Change source rejected: watch room not found');
+                    return;
+                }
+                if (watchRoom.status === 'ended') {
+                    console.log('[SOCKET] Change source rejected: watch room has ended');
+                    return;
+                }
+
+                // Check host/controller permissions
+                const hasControl = hasPlaybackControl(watchRoom._id, userId, watchRoom.host);
+                if (!hasControl) {
+                    console.log(`[SOCKET] Change source rejected: User ${userId} does not have control permissions`);
+                    return;
+                }
+
+                // Create or find the Movie document for the new YouTube video ID
+                const Movie = require('./models/Movie');
+                let movie = await Movie.findOne({ imdbID: `yt_${youtubeVideoId}` });
+                if (!movie) {
+                    console.log(`[SOCKET] Movie document not found for yt_${youtubeVideoId}, creating new one...`);
+                    movie = await Movie.create({
+                        imdbID: `yt_${youtubeVideoId}`,
+                        Title: 'YouTube Video',
+                        Poster: `https://i.ytimg.com/vi/${youtubeVideoId}/hqdefault.jpg`,
+                        videoFolderName: `yt_${youtubeVideoId}`,
+                        Year: new Date().getFullYear().toString(),
+                        Genre: 'YouTube Video',
+                        Runtime: 'Live Stream'
+                    });
+                }
+
+                // Update room's movie reference
+                watchRoom.movie = movie._id;
+                await watchRoom.save();
+                console.log(`[SOCKET] WatchRoom ${watchRoom._id} movie reference updated to Movie ID ${movie._id} (yt_${youtubeVideoId})`);
+
+                // Broadcast to all users in the room (including sender)
+                io.to(`watch:${watchRoom._id.toString()}`).emit('watch:change-source', {
+                    roomId: watchRoom._id.toString(),
+                    youtubeVideoId,
+                    changedBy: socket.user.nickName || socket.user.name
+                });
+
+                console.log(`[SOCKET] watch:change-source: room=${watchRoom._id}, videoId=${youtubeVideoId}, user=${socket.user.nickName} broadcasted`);
+            } catch (error) {
+                console.error('[SOCKET] watch:change-source error:', error.stack || error.message);
+            }
+        });
+
+        /**
          * Host grants playback control to a participant
          */
         socket.on('playback:grant-control', async (data = {}) => {
@@ -1029,7 +1099,7 @@ function initializeSocket(httpServer) {
          * Update video call state of a participant
          */
         socket.on('call:state-change', (data = {}) => {
-            const { roomId, inCall, isMuted, isCameraOff } = data;
+            const { roomId, inCall, isMuted, isCameraOff, isHandRaised } = data;
             if (!roomId) return;
 
             const roomKey = roomId.toString();
@@ -1039,6 +1109,7 @@ function initializeSocket(httpServer) {
                 userPayload.inCall = !!inCall;
                 userPayload.isMuted = !!isMuted;
                 userPayload.isCameraOff = !!isCameraOff;
+                userPayload.isHandRaised = !!isHandRaised;
                 roomUsers.set(userId, userPayload);
 
                 const allUsers = Array.from(roomUsers.values());

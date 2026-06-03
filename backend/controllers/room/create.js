@@ -18,12 +18,32 @@ const notificationService = require('../../utils/notificationService');
 exports.createRoom = async (req, res) => {
     try {
         const hostId = req.user.id;
-        const { movieId, invitedFriends = [], roomName } = req.body;
+        let { movieId, invitedFriends = [], roomName } = req.body;
 
         console.log('[ROOM] Creating room - Host:', hostId, 'Movie:', movieId);
 
-        // Validate movie exists and has video
-        const movie = await Movie.findById(movieId);
+        let movie = null;
+        if (typeof movieId === 'string' && (movieId.startsWith('yt_') || !/^[a-fA-F0-9]{24}$/.test(movieId))) {
+            movie = await Movie.findOne({ imdbID: movieId });
+            if (!movie) {
+                const ytId = movieId.startsWith('yt_') ? movieId.substring(3) : movieId;
+                const title = req.body.movieTitle || 'YouTube Video';
+                const poster = req.body.moviePoster || `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+                movie = await Movie.create({
+                    imdbID: `yt_${ytId}`,
+                    Title: title,
+                    Poster: poster,
+                    videoFolderName: `yt_${ytId}`,
+                    Year: new Date().getFullYear().toString(),
+                    Genre: 'YouTube Video',
+                    Runtime: 'Live Stream'
+                });
+            }
+            movieId = movie._id;
+        } else {
+            movie = await Movie.findById(movieId);
+        }
+
         if (!movie) {
             return res.status(404).json({
                 success: false,

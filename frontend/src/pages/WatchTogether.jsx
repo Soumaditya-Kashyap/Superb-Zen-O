@@ -25,6 +25,8 @@ import { useLocation } from "react-router-dom";   ///////////// by raki
 
 const WatchTogether = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const youtubeMovie = location.state?.youtubeMovie || location.state?.movie || null;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeRooms, setActiveRooms] = useState([]);
   const [pastRooms, setPastRooms] = useState([]);
@@ -34,6 +36,12 @@ const WatchTogether = () => {
   const [joinError, setJoinError] = useState('');
   const [joiningRoom, setJoiningRoom] = useState(false);
   const [copiedRoomId, setCopiedRoomId] = useState(null);
+
+  useEffect(() => {
+    if (youtubeMovie) {
+      setShowCreateModal(true);
+    }
+  }, [youtubeMovie]);
   
   // Confirmation modal states
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -404,27 +412,6 @@ const WatchTogether = () => {
   };
 
 
-
-  const location = useLocation(); //////by raki
-  const [youtubeMovie, setYoutubeMovie] =useState(null);
-useEffect(() => {
-
-  if (
-    location.state?.youtubeMovie
-  ) {
-
-    setYoutubeMovie(
-      location.state.youtubeMovie
-    );
-
-
-
-    // auto open create modal
-    setShowCreateModal(true);
-
-  }
-
-}, [location.state]);
   return (
     <div className="min-h-screen p-6 md:p-10">
       {/* Header */}
