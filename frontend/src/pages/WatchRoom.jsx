@@ -21,8 +21,9 @@ const SAMPLE_VIDEO_URL =
 const SYNC_THRESHOLD = 0.15;
 const HEARTBEAT_INTERVAL = 3000;
 const BUFFER_DELAY = 200;
-const SUPPRESS_EMIT_DURATION = 650;
-const PROGRAMMATIC_FLAG_DURATION = 180;
+const SUPPRESS_EMIT_DURATION = 1200;
+const PROGRAMMATIC_FLAG_DURATION = 500;
+const SYNC_GRACE_PERIOD = 2000; // Don't let heartbeat override for 2s after receiving a sync event
 
 const getIceServers = (dynamicServers) => {
   if (dynamicServers && dynamicServers.length > 0) {
@@ -378,6 +379,7 @@ const WatchRoom = () => {
   const expectedProgrammaticPauseRef = useRef(false);
   const clockOffsetRef = useRef(0);
   const lastHostStateRef = useRef({ time: 0, serverTimestamp: 0, isPlaying: false });
+  const lastSyncEventReceivedRef = useRef(0); // Timestamp of last explicit sync event (play/pause/seek)
   const [videoElement, setVideoElement] = useState(null);
 
   const playerRefCallback = useCallback((node) => {
@@ -623,6 +625,9 @@ const WatchRoom = () => {
 
     const onLocalTimeUpdate = () => {
       if (!hasPlaybackControl && lastHostStateRef.current && lastHostStateRef.current.isPlaying) {
+        // Skip re-alignment during grace period after explicit sync events
+        if (Date.now() - lastSyncEventReceivedRef.current < SYNC_GRACE_PERIOD) return;
+
         const state = lastHostStateRef.current;
         const elapsed = Math.max(0, (Date.now() + clockOffsetRef.current - state.serverTimestamp) / 1000);
         const estimatedHostTime = state.time + elapsed;
@@ -632,16 +637,13 @@ const WatchRoom = () => {
         if (absDrift < 0.05) {
           if (videoElement.playbackRate !== 1.0) {
             videoElement.playbackRate = 1.0;
-            console.log(`[SYNC-SPEED] Re-aligned! Drift is ${currentDrift.toFixed(3)}s. Resetting speed to 1.0`);
           }
         } else if (absDrift <= 1.5) {
           const targetRate = currentDrift < 0 ? 1.05 : 0.95;
           if (videoElement.playbackRate !== targetRate) {
             videoElement.playbackRate = targetRate;
-            console.log(`[SYNC-SPEED] Adjusting speed to ${targetRate} (drift: ${currentDrift.toFixed(3)}s)`);
           }
         } else {
-          console.log(`[SYNC-SPEED] Drift too large (${currentDrift.toFixed(3)}s), performing hard seek`);
           isProgrammaticRef.current = true;
           expectedProgrammaticSeekTimeRef.current = estimatedHostTime;
           videoElement.currentTime = estimatedHostTime;
@@ -767,16 +769,14 @@ const WatchRoom = () => {
       if (isProgrammaticRef.current) return;
       if (Date.now() < suppressEmitsUntilRef.current) return;
 
-      // Only send heartbeat if video is playing
-      if (!video.paused) {
-        socket.emit('video-heartbeat', {
-          roomId: resolvedRoomId || roomId,
-          time: video.currentTime || 0,
-          isPlaying: !video.paused
-        });
-        lastHeartbeatTimeRef.current = Date.now();
-        console.log(`[HEARTBEAT] Sent: time=${video.currentTime.toFixed(2)}s`);
-      }
+      // Send heartbeat for BOTH playing and paused states
+      // This ensures paused state propagates to all clients
+      socket.emit('video-heartbeat', {
+        roomId: resolvedRoomId || roomId,
+        time: video.currentTime || 0,
+        isPlaying: !video.paused
+      });
+      lastHeartbeatTimeRef.current = Date.now();
     }, HEARTBEAT_INTERVAL);
   };
 
@@ -1346,11 +1346,19 @@ const WatchRoom = () => {
 
       if (payload?.videoState) {
         initialSyncAppliedRef.current = true;
-        pendingVideoStateRef.current = payload.videoState;
+        // Always start paused on room entry - video only plays when someone clicks play
+        const initialState = { ...payload.videoState, isPlaying: false };
+        pendingVideoStateRef.current = initialState;
+        // Still store the real server state for the heartbeat sender to reference
+        lastHostStateRef.current = {
+          time: Number(payload.videoState.currentTime || 0),
+          serverTimestamp: Number(payload.videoState.serverTimestamp || Date.now()),
+          isPlaying: !!payload.videoState.isPlaying
+        };
         const video = videoRef.current?.video;
         if (video) {
           if (video.readyState >= 1) {
-            applyRemoteVideoState(video, payload.videoState, true); // Force initial sync
+            applyRemoteVideoState(video, initialState, true);
             pendingVideoStateRef.current = null;
           } else {
             const onLoaded = () => {
@@ -1486,6 +1494,7 @@ const WatchRoom = () => {
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+      lastSyncEventReceivedRef.current = Date.now();
 
       const drift = Math.abs(video.currentTime - compensatedTime);
       if (Number.isFinite(compensatedTime) && drift > SYNC_THRESHOLD) {
@@ -1531,6 +1540,7 @@ const WatchRoom = () => {
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+      lastSyncEventReceivedRef.current = Date.now();
 
       const drift = Math.abs(video.currentTime - targetTime);
       if (Number.isFinite(targetTime) && drift > SYNC_THRESHOLD) {
@@ -1577,6 +1587,7 @@ const WatchRoom = () => {
 
       isProgrammaticRef.current = true;
       suppressEmitsUntilRef.current = Date.now() + SUPPRESS_EMIT_DURATION;
+      lastSyncEventReceivedRef.current = Date.now();
 
       // Force update position
       expectedProgrammaticSeekTimeRef.current = compensatedTime;
@@ -1618,16 +1629,24 @@ const WatchRoom = () => {
         return;
       }
 
+      // During grace period after an explicit sync event (play/pause/seek),
+      // only update lastHostStateRef but DON'T apply corrections.
+      // This prevents the heartbeat from fighting with a just-received play/pause/seek command.
+      const inGracePeriod = Date.now() - lastSyncEventReceivedRef.current < SYNC_GRACE_PERIOD;
+
       const serverTimestamp = Number(payload?.serverTimestamp);
       const targetTime = Number(payload?.time || 0);
       const isPlayingNow = !!payload?.isPlaying;
 
-      // Update last known host state
+      // Always update last known host state
       lastHostStateRef.current = {
         time: targetTime,
         serverTimestamp: serverTimestamp || Date.now(),
         isPlaying: isPlayingNow
       };
+
+      // Skip corrections during grace period to avoid fighting explicit sync events
+      if (inGracePeriod) return;
 
       let compensatedTime = targetTime;
       if (isPlayingNow && serverTimestamp) {
@@ -1638,7 +1657,7 @@ const WatchRoom = () => {
       const currentTime = video.currentTime;
       const drift = Math.abs(currentTime - compensatedTime);
 
-      if (drift > 1.5) {
+      if (drift > 2.0) {
         console.log(`[SYNC] Heartbeat corrected (Hard seek): local=${currentTime.toFixed(2)}s, target=${compensatedTime.toFixed(2)}s (drift=${drift.toFixed(2)}s)`);
         isProgrammaticRef.current = true;
         expectedProgrammaticSeekTimeRef.current = compensatedTime;
@@ -1647,12 +1666,11 @@ const WatchRoom = () => {
         setTimeout(() => {
           isProgrammaticRef.current = false;
         }, PROGRAMMATIC_FLAG_DURATION);
-      } else if (drift > 0.05) {
-        // Dynamic speed tuning
-        const targetRate = currentTime < compensatedTime ? 1.05 : 0.95;
+      } else if (drift > 0.1) {
+        // Dynamic speed tuning - gentler adjustment
+        const targetRate = currentTime < compensatedTime ? 1.03 : 0.97;
         if (video.playbackRate !== targetRate) {
           video.playbackRate = targetRate;
-          console.log(`[SYNC-SPEED] Heartbeat speed adjust: targetRate=${targetRate} (drift=${(currentTime - compensatedTime).toFixed(3)}s)`);
         }
       } else {
         if (video.playbackRate !== 1.0) {
@@ -1660,6 +1678,7 @@ const WatchRoom = () => {
         }
       }
 
+      // Sync play/pause state
       if (isPlayingNow && video.paused) {
         expectedProgrammaticPlayRef.current = true;
         video.play().catch(() => {
@@ -1877,10 +1896,12 @@ const WatchRoom = () => {
 
     const applyInitialState = async () => {
       initialSyncAppliedRef.current = true;
+      // On initial room entry, always start paused. The user must press play.
+      // This prevents auto-play when host enters the room or when a new user joins.
       await applyRemoteVideoState(video, {
         currentTime: state.currentTime || 0,
-        isPlaying: !!state.isPlaying,
-      }, true); // Force initial sync
+        isPlaying: false,
+      }, true); // Force initial sync, but always paused
     };
 
     const onLoadedMetadata = () => {
