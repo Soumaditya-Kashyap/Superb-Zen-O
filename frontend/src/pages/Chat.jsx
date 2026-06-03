@@ -22,7 +22,15 @@ const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK ||
 // For testing with teammate, change this to the host machine's IP address
 // e.g., 'http://192.168.1.100:5000' 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL;
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_URL}/api`;
+
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+  }
+  return `${API_URL}/api`;
+};
+const API_BASE_URL = getApiBaseUrl();
 
 const Chat = () => {
   // View state: 'connect' or 'chat'

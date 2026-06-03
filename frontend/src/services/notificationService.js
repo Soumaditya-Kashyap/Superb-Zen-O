@@ -5,7 +5,14 @@ const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK ||
  * Handles API calls for the notification system
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_URL}/api`;
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+  }
+  return `${API_URL}/api`;
+};
+const API_BASE_URL = getApiBaseUrl();
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');

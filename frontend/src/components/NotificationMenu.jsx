@@ -33,7 +33,15 @@ import NotificationService from '../services/notificationService';
 const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK || 'http://localhost:5000';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL;
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_URL}/api`;
+
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_LINK;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+  }
+  return `${API_URL}/api`;
+};
+const API_BASE_URL = getApiBaseUrl();
 
 // Notification type icons and colors
 const notificationConfig = {
