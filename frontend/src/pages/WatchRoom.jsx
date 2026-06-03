@@ -61,6 +61,16 @@ const getIceServers = () => {
         urls: 'turn:openrelay.metered.ca:443?transport=tcp',
         username: 'openrelayproject',
         credential: 'openrelayproject'
+      },
+      {
+        urls: 'turns:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
       }
     );
   }
@@ -73,10 +83,29 @@ const VideoStreamElement = memo(({ stream, isMuted, isSelf }) => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    const handleTrackAdded = () => {
+      console.log(`[VideoStreamElement] Track event detected. Re-attaching stream. isSelf=${isSelf}`);
+      video.srcObject = null;
+      video.srcObject = stream;
+    };
+
     if (video.srcObject !== stream) {
       console.log(`[VideoStreamElement] Attaching stream. isSelf=${isSelf}, streamId=${stream?.id}`);
       video.srcObject = stream;
     }
+
+    if (stream) {
+      stream.addEventListener('addtrack', handleTrackAdded);
+      stream.addEventListener('removetrack', handleTrackAdded);
+    }
+
+    return () => {
+      if (stream) {
+        stream.removeEventListener('addtrack', handleTrackAdded);
+        stream.removeEventListener('removetrack', handleTrackAdded);
+      }
+    };
   }, [stream, isSelf]);
 
   return (
@@ -96,10 +125,29 @@ const AudioStreamElement = memo(({ stream }) => {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    const handleTrackAdded = () => {
+      console.log(`[AudioStreamElement] Track event detected. Re-attaching audio stream.`);
+      audio.srcObject = null;
+      audio.srcObject = stream;
+    };
+
     if (audio.srcObject !== stream) {
       console.log(`[AudioStreamElement] Attaching audio stream. streamId=${stream?.id}`);
       audio.srcObject = stream;
     }
+
+    if (stream) {
+      stream.addEventListener('addtrack', handleTrackAdded);
+      stream.addEventListener('removetrack', handleTrackAdded);
+    }
+
+    return () => {
+      if (stream) {
+        stream.removeEventListener('addtrack', handleTrackAdded);
+        stream.removeEventListener('removetrack', handleTrackAdded);
+      }
+    };
   }, [stream]);
 
   return (
@@ -311,6 +359,7 @@ const WatchRoom = () => {
 
   const peerConnectionsRef = useRef(new Map());
   const localStreamRef = useRef(null);
+  const iceCandidatesQueueRef = useRef(new Map());
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -724,6 +773,7 @@ const WatchRoom = () => {
     });
     peerConnectionsRef.current.clear();
     setRemoteStreams({});
+    iceCandidatesQueueRef.current.clear();
     
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
@@ -738,6 +788,7 @@ const WatchRoom = () => {
       console.log(`[WEBRTC] Closing existing peer connection with ${peerId}`);
       peerConnectionsRef.current.get(peerId).close();
       peerConnectionsRef.current.delete(peerId);
+      iceCandidatesQueueRef.current.delete(peerId);
     }
 
     const servers = getIceServers();
@@ -765,16 +816,6 @@ const WatchRoom = () => {
       console.log(`[WEBRTC] PeerConnection(${peerId}) iceGatheringState changed: ${pc.iceGatheringState}`);
     };
 
-    // Add local tracks
-    if (localStreamRef.current) {
-      console.log(`[WEBRTC] Adding local tracks to peer connection for peer=${peerId}`);
-      localStreamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, localStreamRef.current);
-      });
-    } else {
-      console.warn(`[WEBRTC] No local stream found while creating peer connection for peer=${peerId}`);
-    }
-
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         console.log(`[WEBRTC] Generated ICE candidate for peer=${peerId}:`, event.candidate.candidate);
@@ -790,20 +831,36 @@ const WatchRoom = () => {
     };
 
     pc.ontrack = (event) => {
-      console.log(`[WEBRTC] ontrack fired from peer=${peerId}`);
-      if (event.streams && event.streams[0]) {
-        console.log(`[WEBRTC] Remote stream received from peer=${peerId}: ID=${event.streams[0].id}`);
-        setRemoteStreams(prev => ({
+      console.log(`[WEBRTC] ontrack fired from peer=${peerId}, track.kind=${event.track.kind}`);
+      
+      setRemoteStreams(prev => {
+        let prevStream = prev[peerId];
+        let newStream;
+        
+        if (prevStream) {
+          const tracks = prevStream.getTracks();
+          const hasTrack = tracks.some(t => t.id === event.track.id);
+          const allTracks = hasTrack ? tracks : [...tracks, event.track];
+          newStream = new MediaStream(allTracks);
+          console.log(`[WEBRTC] Rebuilt stream with ${allTracks.length} tracks for peer=${peerId}. Added track ID: ${event.track.id}`);
+        } else {
+          if (event.streams && event.streams[0]) {
+            newStream = event.streams[0];
+            console.log(`[WEBRTC] Using event stream for peer=${peerId}: ID=${newStream.id}, tracks=${newStream.getTracks().length}`);
+          } else {
+            newStream = new MediaStream([event.track]);
+            console.log(`[WEBRTC] Created new MediaStream with track for peer=${peerId}`);
+          }
+        }
+        
+        return {
           ...prev,
-          [peerId]: event.streams[0]
-        }));
-      } else {
-        console.warn(`[WEBRTC] ontrack fired from peer=${peerId} but no streams exist in event!`);
-      }
+          [peerId]: newStream
+        };
+      });
     };
 
-    peerConnectionsRef.current.set(peerId, pc);
-
+    // Register onnegotiationneeded BEFORE adding tracks!
     if (isInitiator) {
       pc.onnegotiationneeded = async () => {
         try {
@@ -825,6 +882,18 @@ const WatchRoom = () => {
         }
       };
     }
+
+    // Add local tracks AFTER event listeners are registered!
+    if (localStreamRef.current) {
+      console.log(`[WEBRTC] Adding local tracks to peer connection for peer=${peerId}`);
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    } else {
+      console.warn(`[WEBRTC] No local stream found while creating peer connection for peer=${peerId}`);
+    }
+
+    peerConnectionsRef.current.set(peerId, pc);
 
     return pc;
   };
@@ -1576,17 +1645,49 @@ const WatchRoom = () => {
             targetUserId: senderUserId,
             signal: pc.localDescription
           });
+
+          // Flush queued candidates
+          const queue = iceCandidatesQueueRef.current.get(senderUserId);
+          if (queue && queue.length > 0) {
+            console.log(`[WEBRTC] Processing ${queue.length} queued candidates for peer=${senderUserId} after offer description set`);
+            const candidatesToApply = [...queue];
+            iceCandidatesQueueRef.current.set(senderUserId, []);
+            for (const cand of candidatesToApply) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                console.log(`[WEBRTC] Applied queued ICE candidate for peer=${senderUserId}`);
+              } catch (candErr) {
+                console.error(`[WEBRTC] Failed to apply queued ICE candidate for peer=${senderUserId}:`, candErr);
+              }
+            }
+          }
         } else if (signal.type === 'answer') {
           console.log(`[WEBRTC] Processing answer from peer=${senderUserId}`);
           if (pc) {
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             console.log(`[WEBRTC] setRemoteDescription (answer) success for peer=${senderUserId}`);
+
+            // Flush queued candidates
+            const queue = iceCandidatesQueueRef.current.get(senderUserId);
+            if (queue && queue.length > 0) {
+              console.log(`[WEBRTC] Processing ${queue.length} queued candidates for peer=${senderUserId} after answer description set`);
+              const candidatesToApply = [...queue];
+              iceCandidatesQueueRef.current.set(senderUserId, []);
+              for (const cand of candidatesToApply) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                  console.log(`[WEBRTC] Applied queued ICE candidate for peer=${senderUserId}`);
+                } catch (candErr) {
+                  console.error(`[WEBRTC] Failed to apply queued ICE candidate for peer=${senderUserId}:`, candErr);
+                }
+              }
+            }
           } else {
             console.warn(`[WEBRTC] Received answer from peer=${senderUserId} but no PeerConnection existed!`);
           }
         } else if (signal.type === 'candidate') {
           console.log(`[WEBRTC] Processing candidate from peer=${senderUserId}`);
-          if (pc && signal.candidate) {
+          if (pc && pc.remoteDescription && pc.remoteDescription.type) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
               console.log(`[WEBRTC] addIceCandidate success for peer=${senderUserId}`);
@@ -1594,7 +1695,11 @@ const WatchRoom = () => {
               console.error(`[WEBRTC] addIceCandidate error for peer=${senderUserId}:`, candErr);
             }
           } else {
-            console.warn(`[WEBRTC] Received candidate for peer=${senderUserId} but peerConnection is ${pc ? 'exists' : 'null'} and candidate is ${signal.candidate ? 'exists' : 'null'}`);
+            console.log(`[WEBRTC] Queuing candidate for peer=${senderUserId} (pc exists? ${!!pc}, remoteDesc exists? ${!!(pc && pc.remoteDescription)})`);
+            if (!iceCandidatesQueueRef.current.has(senderUserId)) {
+              iceCandidatesQueueRef.current.set(senderUserId, []);
+            }
+            iceCandidatesQueueRef.current.get(senderUserId).push(signal.candidate);
           }
         }
       } catch (err) {
