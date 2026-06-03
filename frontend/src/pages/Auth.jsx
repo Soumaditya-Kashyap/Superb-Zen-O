@@ -154,7 +154,7 @@ const Auth = ({ setIsAuthenticated }) => {
           {/* Logo at top center */}
           <div className="text-center mb-10">
             <img 
-              src="/images/appLogo/superb-light.png" 
+              src="https://ik.imagekit.io/ugweqp16c/images/appLogo/superb-light.png?updatedAt=1764608226250" 
               alt="Superb Logo" 
               className="h-20 mx-auto mb-3"
             />
@@ -165,7 +165,7 @@ const Auth = ({ setIsAuthenticated }) => {
           <div className="w-full">
             <div className="glass-effect-dark rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
               <img 
-                src="/images/authScene/3942584.jpg"
+                src="https://ik.imagekit.io/ugweqp16c/images/authScreen/3942584.jpg?updatedAt=1764608226291"
                 alt="Your Friends Are Waiting" 
                 className="w-full h-[380px] object-cover"
               />

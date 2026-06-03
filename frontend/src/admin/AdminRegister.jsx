@@ -273,7 +273,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
       <div className="hidden lg:flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-black px-16">
         <div className="w-full max-w-2xl text-center">
           <img
-            src="/images/appLogo/superb-light.png"
+            src="https://ik.imagekit.io/ugweqp16c/images/appLogo/superb-light.png?updatedAt=1764608226250"
             className="h-20 mx-auto mb-4"
             alt="Admin Logo"
           />
@@ -281,7 +281,7 @@ const AdminRegister = ({ setIsAdminAuthenticated }) => {
 
           <div className="glass-effect-dark rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
             <img
-              src="/images/authScreen/3942584.jpg"
+              src="https://ik.imagekit.io/ugweqp16c/images/authScreen/3942584.jpg?updatedAt=1764608226291"
               className="w-full h-[380px] object-cover"
               alt="Admin Signup"
             />
