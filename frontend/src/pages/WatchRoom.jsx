@@ -24,7 +24,12 @@ const BUFFER_DELAY = 200;
 const SUPPRESS_EMIT_DURATION = 650;
 const PROGRAMMATIC_FLAG_DURATION = 180;
 
-const getIceServers = () => {
+const getIceServers = (dynamicServers) => {
+  if (dynamicServers && dynamicServers.length > 0) {
+    console.log('[WEBRTC-ICE] Using dynamically fetched TURN servers from backend:', dynamicServers);
+    return dynamicServers;
+  }
+
   const customTurnUrl = import.meta.env.VITE_TURN_URL;
   const customTurnUser = import.meta.env.VITE_TURN_USERNAME;
   const customTurnCred = import.meta.env.VITE_TURN_CREDENTIAL;
@@ -34,11 +39,13 @@ const getIceServers = () => {
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'stun:openrelay.metered.ca:443' }
   ];
 
   if (customTurnUrl && customTurnUser && customTurnCred) {
-    console.log('[WEBRTC-ICE] Using custom TURN configuration:', customTurnUrl);
+    console.log('[WEBRTC-ICE] Using custom static TURN configuration:', customTurnUrl);
     servers.push({
       urls: customTurnUrl,
       username: customTurnUser,
@@ -46,33 +53,17 @@ const getIceServers = () => {
     });
   } else {
     console.log('[WEBRTC-ICE] Falling back to public OpenRelay project TURN servers');
-    servers.push(
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turns:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
-    );
+    servers.push({
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+        'turns:openrelay.metered.ca:443',
+        'turns:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    });
   }
   return servers;
 };
@@ -360,6 +351,7 @@ const WatchRoom = () => {
   const peerConnectionsRef = useRef(new Map());
   const localStreamRef = useRef(null);
   const iceCandidatesQueueRef = useRef(new Map());
+  const iceServersRef = useRef(null);
 
   const socketRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -422,6 +414,35 @@ const WatchRoom = () => {
   /* =========================================
      FETCH LATEST USER DATA
   ========================================= */
+
+  useEffect(() => {
+    const fetchDynamicIceServers = async () => {
+      try {
+        console.log('[WEBRTC-ICE] Fetching dynamic TURN credentials from backend...');
+        const token = localStorage.getItem('token');
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(`${API_URL}/api/rtc/turn`, { headers });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.servers && data.servers.length > 0) {
+            console.log('[WEBRTC-ICE] Successfully loaded dynamic TURN servers:', data.servers);
+            iceServersRef.current = data.servers;
+          } else {
+            console.log('[WEBRTC-ICE] No dynamic TURN servers returned from backend. Using static fallbacks.');
+          }
+        } else {
+          console.warn('[WEBRTC-ICE] Failed to fetch dynamic TURN servers status:', response.status);
+        }
+      } catch (err) {
+        console.error('[WEBRTC-ICE] Error fetching dynamic TURN servers:', err);
+      }
+    };
+
+    fetchDynamicIceServers();
+  }, []);
 
   useEffect(() => {
 
@@ -791,7 +812,7 @@ const WatchRoom = () => {
       iceCandidatesQueueRef.current.delete(peerId);
     }
 
-    const servers = getIceServers();
+    const servers = getIceServers(iceServersRef.current);
     console.log(`[WEBRTC] Initializing RTCPeerConnection for peer=${peerId} with servers:`, servers);
     const pc = new RTCPeerConnection({ iceServers: servers });
 

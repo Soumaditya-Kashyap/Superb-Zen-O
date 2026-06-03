@@ -67,6 +67,30 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
+// Dynamic TURN Credentials Route
+app.get('/api/rtc/turn', async (req, res) => {
+  try {
+    const apiKey = process.env.METERED_API_KEY;
+    if (!apiKey) {
+      console.warn('[RTC-TURN] METERED_API_KEY is not set. Client will fallback to static servers.');
+      return res.json({ servers: [] });
+    }
+
+    console.log('[RTC-TURN] Requesting dynamic credentials from Metered.ca...');
+    const response = await fetch(`https://metered.ca/api/v1/turn/credentials?apiKey=${apiKey}`);
+    if (!response.ok) {
+      throw new Error(`Metered API responded with status ${response.status}`);
+    }
+    const servers = await response.json();
+    console.log('[RTC-TURN] Successfully retrieved dynamic credentials.');
+    res.json({ servers });
+  } catch (err) {
+    console.error('[RTC-TURN] Failed to fetch TURN credentials:', err.message);
+    // Return empty list so client falls back gracefully rather than crashing the page
+    res.json({ servers: [] });
+  }
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
