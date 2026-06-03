@@ -29,7 +29,18 @@ function initializeSocket(httpServer) {
 
     const io = new Server(httpServer, {
         cors: {
-            origin: true, // Allow all origins in development
+            origin: function (origin, callback) {
+                const allowedOrigins = [
+                    "http://localhost:5173",
+                    "http://localhost:3000",
+                    "https://superb-zen-dngldjs41-soumaditya-kashyaps-projects.vercel.app"
+                ];
+                if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+                    callback(null, true);
+                } else {
+                    callback(new Error("Not allowed by CORS"));
+                }
+            },
             methods: ['GET', 'POST'],
             credentials: true
         },
@@ -520,8 +531,7 @@ function initializeSocket(httpServer) {
                     return;
                 }
 
-                // Create or find the Movie document for the new YouTube video ID
-                const Movie = require('./models/Movie');
+                const Movie = require('./models/movie');
                 let movie = await Movie.findOne({ imdbID: `yt_${youtubeVideoId}` });
                 if (!movie) {
                     console.log(`[SOCKET] Movie document not found for yt_${youtubeVideoId}, creating new one...`);
