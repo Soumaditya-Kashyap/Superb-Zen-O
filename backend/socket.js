@@ -1094,9 +1094,14 @@ function initializeSocket(httpServer) {
          */
         socket.on('webrtc:signal', (data = {}) => {
             const { targetUserId, signal } = data;
-            if (!targetUserId || !signal) return;
+            if (!targetUserId || !signal) {
+                console.log(`[SOCKET-WEBRTC] Rejected signal: targetUserId=${!!targetUserId}, signal=${!!signal}`);
+                return;
+            }
 
             const targetSocketId = onlineUsers.get(targetUserId.toString());
+            console.log(`[SOCKET-WEBRTC] Signal trace: ${socket.user.nickName} (${userId}) -> target: ${targetUserId} (${signal.type || 'candidate'}). Target socket: ${targetSocketId ? 'ONLINE' : 'OFFLINE'}`);
+
             if (targetSocketId) {
                 io.to(targetSocketId).emit('webrtc:signal', {
                     senderUserId: userId,

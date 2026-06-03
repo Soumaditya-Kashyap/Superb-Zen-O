@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Hls from 'hls.js';
@@ -24,6 +24,263 @@ const BUFFER_DELAY = 200;
 const SUPPRESS_EMIT_DURATION = 650;
 const PROGRAMMATIC_FLAG_DURATION = 180;
 
+const getIceServers = () => {
+  const customTurnUrl = import.meta.env.VITE_TURN_URL;
+  const customTurnUser = import.meta.env.VITE_TURN_USERNAME;
+  const customTurnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+  
+  const servers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
+  ];
+
+  if (customTurnUrl && customTurnUser && customTurnCred) {
+    console.log('[WEBRTC-ICE] Using custom TURN configuration:', customTurnUrl);
+    servers.push({
+      urls: customTurnUrl,
+      username: customTurnUser,
+      credential: customTurnCred
+    });
+  } else {
+    console.log('[WEBRTC-ICE] Falling back to public OpenRelay project TURN servers');
+    servers.push(
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    );
+  }
+  return servers;
+};
+
+const VideoStreamElement = memo(({ stream, isMuted, isSelf }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.srcObject !== stream) {
+      console.log(`[VideoStreamElement] Attaching stream. isSelf=${isSelf}, streamId=${stream?.id}`);
+      video.srcObject = stream;
+    }
+  }, [stream, isSelf]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isMuted}
+      className={`w-full h-full object-cover ${isSelf ? 'transform -scale-x-100' : ''}`}
+    />
+  );
+});
+
+const AudioStreamElement = memo(({ stream }) => {
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.srcObject !== stream) {
+      console.log(`[AudioStreamElement] Attaching audio stream. streamId=${stream?.id}`);
+      audio.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <audio
+      ref={audioRef}
+      autoPlay
+      playsInline
+      className="hidden"
+    />
+  );
+});
+
+const ChatInputArea = memo(({ onSendMessage, chatSending }) => {
+  const [chatInput, setChatInput] = useState('');
+
+  const handleSend = () => {
+    const content = chatInput.trim();
+    if (!content || chatSending) return;
+    onSendMessage(content);
+    setChatInput('');
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3">
+      <div className="flex items-center gap-2 flex-1">
+        <input
+          type="text"
+          placeholder="Type a message..."
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 outline-none text-white text-sm placeholder:text-white/40 focus:border-gold/50"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!chatInput.trim() || chatSending}
+          className="px-5 py-1.5 rounded-xl bg-gold text-black text-sm font-semibold hover:bg-gold-light transition shrink-0"
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+});
+
+const normalizeId = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    if (value.$oid) return value.$oid;
+    if (value._id) return normalizeId(value._id);
+  }
+  return String(value);
+};
+
+const ParticipantCard = memo(({
+  participant,
+  isSelf,
+  inCall,
+  isCameraOff,
+  isMuted,
+  isHandRaised,
+  localStream,
+  remoteStream,
+  currentUser,
+  isRoomHost,
+  hasControl,
+  onGrantControl,
+  onRevokeControl
+}) => {
+  const pId = normalizeId(participant.id || participant._id);
+  const hasVideo = isSelf ? (inCall && !isCameraOff && localStream) : (participant.inCall && !participant.isCameraOff && remoteStream);
+  const isMutedState = isSelf ? isMuted : participant.isMuted;
+  const isHandRaisedState = isSelf ? isHandRaised : participant.isHandRaised;
+
+  return (
+    <div
+      className="w-full aspect-video rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-3 relative overflow-hidden"
+    >
+      {/* Bouncing Hand-Raised Badge */}
+      {isHandRaisedState && (
+        <div className="absolute top-2 right-2 z-30 bg-gold text-black text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-lg font-bold">
+          ✋
+        </div>
+      )}
+
+      {hasVideo ? (
+        <div className="absolute inset-0 w-full h-full bg-black z-0">
+          <VideoStreamElement
+            stream={isSelf ? localStream : remoteStream}
+            isMuted={isSelf}
+            isSelf={isSelf}
+          />
+          
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10 bg-black/60 backdrop-blur-md rounded-lg px-2 py-1 border border-white/5">
+            <span className="text-[10px] text-white truncate max-w-[120px]">
+              {participant.nickName || participant.name} {isSelf && '(You)'}
+            </span>
+            {isMutedState && (
+              <MicOff className="w-3 h-3 text-red-400 shrink-0" />
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Render hidden audio element so remote voice is always heard even when camera is off */}
+          {!isSelf && participant.inCall && remoteStream && (
+            <AudioStreamElement stream={remoteStream} />
+          )}
+
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-1 border border-white/10 shrink-0 relative">
+            {isSelf && currentUser?.profilePicture ? (
+              <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+            ) : participant?.profilePicture ? (
+              <img src={participant.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gold to-yellow-500" />
+            )}
+            
+            {participant.inCall && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <VideoOff className="w-4 h-4 text-white/80" />
+              </div>
+            )}
+          </div>
+          
+          <p className="text-xs text-white text-center font-medium line-clamp-1">
+            {participant.nickName || participant.name}
+            {isSelf ? ' (You)' : ''}
+          </p>
+          
+          <div className="flex items-center gap-2 mt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+            <p className="text-[10px] text-green-400">Online</p>
+            {participant.inCall && (
+              <span className="text-[9px] bg-green-500/20 text-green-300 px-1 py-0.5 rounded border border-green-500/20 font-semibold">
+                In Call
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2 mt-1">
+            {isMutedState && participant.inCall && (
+              <div className="flex items-center gap-0.5 text-red-400 text-[10px]">
+                <MicOff className="w-2.5 h-2.5" />
+                <span>Muted</span>
+              </div>
+            )}
+
+            {!isRoomHost && hasControl && (
+              <span className="text-[9px] bg-gold/10 text-gold px-1 py-0.5 rounded border border-gold/20 font-semibold">
+                Control
+              </span>
+            )}
+          </div>
+
+          {isRoomHost && !isSelf && (
+            <button
+              onClick={() => hasControl ? onRevokeControl(pId) : onGrantControl(pId)}
+              className={`mt-2 text-[9px] px-2 py-0.5 rounded border transition-all ${
+                hasControl
+                  ? 'bg-gold/20 text-gold border-gold/30 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30'
+                  : 'bg-white/5 text-white/50 border-white/10 hover:bg-gold/20 hover:text-gold hover:border-gold/30'
+              }`}
+            >
+              {hasControl ? 'Revoke Control' : 'Grant Control'}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+});
+
 const WatchRoom = () => {
   const navigate = useNavigate();
   const { roomId } = useParams();
@@ -33,7 +290,6 @@ const WatchRoom = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [floatingMessages, setFloatingMessages] = useState([]);
   const [showParticipantsSidebar, setShowParticipantsSidebar] = useState(true);
-  const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState('');
@@ -180,21 +436,6 @@ const WatchRoom = () => {
   const currentUserId =
     currentUser.id || currentUser._id;
 
-  const normalizeId = (value) => {
-    if (!value) return '';
-
-    if (typeof value === 'string')
-      return value;
-
-    if (typeof value === 'object') {
-      if (value.$oid) return value.$oid;
-
-      if (value._id)
-        return normalizeId(value._id);
-    }
-
-    return String(value);
-  };
 
   const hostUserId = normalizeId(
     roomData?.host?._id ||
@@ -492,41 +733,72 @@ const WatchRoom = () => {
   };
 
   const createPeerConnection = (peerId, isInitiator) => {
+    console.log(`[WEBRTC] createPeerConnection for peer=${peerId}, isInitiator=${isInitiator}`);
     if (peerConnectionsRef.current.has(peerId)) {
+      console.log(`[WEBRTC] Closing existing peer connection with ${peerId}`);
       peerConnectionsRef.current.get(peerId).close();
       peerConnectionsRef.current.delete(peerId);
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
+    const servers = getIceServers();
+    console.log(`[WEBRTC] Initializing RTCPeerConnection for peer=${peerId} with servers:`, servers);
+    const pc = new RTCPeerConnection({ iceServers: servers });
+
+    // Track states
+    pc.onconnectionstatechange = () => {
+      console.log(`[WEBRTC] PeerConnection(${peerId}) connectionState changed: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed') {
+        console.error(`[WEBRTC] PeerConnection(${peerId}) failed. NAT traversal may have failed.`);
+      } else if (pc.connectionState === 'disconnected') {
+        console.warn(`[WEBRTC] PeerConnection(${peerId}) disconnected.`);
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[WEBRTC] PeerConnection(${peerId}) iceConnectionState changed: ${pc.iceConnectionState}`);
+      if (pc.iceConnectionState === 'failed') {
+        console.error(`[WEBRTC] PeerConnection(${peerId}) ICE Connection failed. TURN server might be unreachable or misconfigured.`);
+      }
+    };
+
+    pc.ongatheringstatechange = () => {
+      console.log(`[WEBRTC] PeerConnection(${peerId}) iceGatheringState changed: ${pc.iceGatheringState}`);
+    };
 
     // Add local tracks
     if (localStreamRef.current) {
+      console.log(`[WEBRTC] Adding local tracks to peer connection for peer=${peerId}`);
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current);
       });
+    } else {
+      console.warn(`[WEBRTC] No local stream found while creating peer connection for peer=${peerId}`);
     }
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current) {
-        socketRef.current.emit('webrtc:signal', {
-          targetUserId: peerId,
-          signal: { type: 'candidate', candidate: event.candidate }
-        });
+      if (event.candidate) {
+        console.log(`[WEBRTC] Generated ICE candidate for peer=${peerId}:`, event.candidate.candidate);
+        if (socketRef.current) {
+          socketRef.current.emit('webrtc:signal', {
+            targetUserId: peerId,
+            signal: { type: 'candidate', candidate: event.candidate }
+          });
+        }
+      } else {
+        console.log(`[WEBRTC] ICE Candidate Gathering complete for peer=${peerId}`);
       }
     };
 
     pc.ontrack = (event) => {
-      console.log(`[WEBRTC] Received track from ${peerId}`);
+      console.log(`[WEBRTC] ontrack fired from peer=${peerId}`);
       if (event.streams && event.streams[0]) {
+        console.log(`[WEBRTC] Remote stream received from peer=${peerId}: ID=${event.streams[0].id}`);
         setRemoteStreams(prev => ({
           ...prev,
           [peerId]: event.streams[0]
         }));
+      } else {
+        console.warn(`[WEBRTC] ontrack fired from peer=${peerId} but no streams exist in event!`);
       }
     };
 
@@ -535,14 +807,21 @@ const WatchRoom = () => {
     if (isInitiator) {
       pc.onnegotiationneeded = async () => {
         try {
+          console.log(`[WEBRTC] Negotiation needed for peer=${peerId}. Creating offer...`);
           const offer = await pc.createOffer();
+          console.log(`[WEBRTC] offer created for peer=${peerId}:`, offer);
           await pc.setLocalDescription(offer);
-          socketRef.current.emit('webrtc:signal', {
-            targetUserId: peerId,
-            signal: pc.localDescription
-          });
+          console.log(`[WEBRTC] setLocalDescription (offer) success for peer=${peerId}`);
+          
+          if (socketRef.current) {
+            console.log(`[WEBRTC] Sending offer to peer=${peerId}`);
+            socketRef.current.emit('webrtc:signal', {
+              targetUserId: peerId,
+              signal: pc.localDescription
+            });
+          }
         } catch (err) {
-          console.error('[WEBRTC] Offer creation error:', err);
+          console.error(`[WEBRTC] createOffer/setLocalDescription error for peer=${peerId}:`, err);
         }
       };
     }
@@ -1273,29 +1552,53 @@ const WatchRoom = () => {
     socket.on('webrtc:signal', async (payload) => {
       const { senderUserId, signal } = payload;
       let pc = peerConnectionsRef.current.get(senderUserId);
+      
+      console.log(`[WEBRTC] Received signal from peer=${senderUserId}: type=${signal ? (signal.type || 'candidate') : 'undefined'}`);
+
       try {
         if (signal.type === 'offer') {
+          console.log(`[WEBRTC] Processing offer from peer=${senderUserId}`);
           if (!pc) {
+            console.log(`[WEBRTC] PeerConnection for peer=${senderUserId} does not exist, creating one...`);
             pc = createPeerConnection(senderUserId, false);
           }
           await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          console.log(`[WEBRTC] setRemoteDescription (offer) success for peer=${senderUserId}`);
+          
+          console.log(`[WEBRTC] Creating answer for peer=${senderUserId}...`);
           const answer = await pc.createAnswer();
+          console.log(`[WEBRTC] Answer created for peer=${senderUserId}:`, answer);
           await pc.setLocalDescription(answer);
+          console.log(`[WEBRTC] setLocalDescription (answer) success for peer=${senderUserId}`);
+          
+          console.log(`[WEBRTC] Sending answer to peer=${senderUserId}`);
           socket.emit('webrtc:signal', {
             targetUserId: senderUserId,
             signal: pc.localDescription
           });
         } else if (signal.type === 'answer') {
+          console.log(`[WEBRTC] Processing answer from peer=${senderUserId}`);
           if (pc) {
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
+            console.log(`[WEBRTC] setRemoteDescription (answer) success for peer=${senderUserId}`);
+          } else {
+            console.warn(`[WEBRTC] Received answer from peer=${senderUserId} but no PeerConnection existed!`);
           }
         } else if (signal.type === 'candidate') {
+          console.log(`[WEBRTC] Processing candidate from peer=${senderUserId}`);
           if (pc && signal.candidate) {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              console.log(`[WEBRTC] addIceCandidate success for peer=${senderUserId}`);
+            } catch (candErr) {
+              console.error(`[WEBRTC] addIceCandidate error for peer=${senderUserId}:`, candErr);
+            }
+          } else {
+            console.warn(`[WEBRTC] Received candidate for peer=${senderUserId} but peerConnection is ${pc ? 'exists' : 'null'} and candidate is ${signal.candidate ? 'exists' : 'null'}`);
           }
         }
       } catch (err) {
-        console.error('[WEBRTC] Signaling error:', err);
+        console.error(`[WEBRTC] error handling signal from peer=${senderUserId}:`, err);
       }
     });
 
@@ -1445,11 +1748,8 @@ const WatchRoom = () => {
 
 
 
-  const handleSendMessage =
-    async () => {
-      const content =
-        chatInput.trim();
-
+  const handleSendMessage = useCallback(
+    async (content) => {
       if (
         !content ||
         !socketRef.current
@@ -1470,22 +1770,9 @@ const WatchRoom = () => {
           setChatSending(false);
         }
       );
-
-      setChatInput('');
-    };
-
-  const handleChatKeyDown = (
-    e
-  ) => {
-    if (
-      e.key === 'Enter' &&
-      !e.shiftKey
-    ) {
-      e.preventDefault();
-
-      handleSendMessage();
-    }
-  };
+    },
+    [resolvedRoomId, roomId]
+  );
 
   /**
    * IMPROVED: Emit video sync events with timestamp for race condition prevention
@@ -1664,25 +1951,7 @@ const WatchRoom = () => {
               </div>
             </section>
 
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 backdrop-blur-2xl px-4 py-3">
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={handleChatKeyDown}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 outline-none text-white text-sm placeholder:text-white/40 focus:border-gold/50"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim() || chatSending}
-                  className="px-5 py-1.5 rounded-xl bg-gold text-black text-sm font-semibold hover:bg-gold-light transition shrink-0"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
+            <ChatInputArea onSendMessage={handleSendMessage} chatSending={chatSending} />
           </div>
 
           <AnimatePresence>
@@ -1732,122 +2001,24 @@ const WatchRoom = () => {
                   {activeUsers.map((participant, index) => {
                     const pId = normalizeId(participant.id || participant._id);
                     const isSelf = isCurrentUser(participant);
-                    const hasVideo = isSelf ? (inCall && !isCameraOff && localStream) : (participant.inCall && !participant.isCameraOff && remoteStreams[pId]);
-                    const isMutedState = isSelf ? isMuted : participant.isMuted;
-                    const isHandRaisedState = isSelf ? isHandRaised : participant.isHandRaised;
-
+                    const hasControl = canUserControlPlayback(participant);
                     return (
-                      <div
+                      <ParticipantCard
                         key={pId || index}
-                        className="w-full aspect-video rounded-2xl border border-white/10 bg-white/5 flex flex-col items-center justify-center p-3 relative overflow-hidden"
-                      >
-                        {/* Bouncing Hand-Raised Badge */}
-                        {isHandRaisedState && (
-                          <div className="absolute top-2 right-2 z-30 bg-gold text-black text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-lg font-bold">
-                            ✋
-                          </div>
-                        )}
-
-                        {hasVideo ? (
-                          <div className="absolute inset-0 w-full h-full bg-black z-0">
-                            <video
-                              ref={el => {
-                                  if (el) {
-                                    el.srcObject = isSelf ? localStream : remoteStreams[pId];
-                                  }
-                              }}
-                              autoPlay
-                              playsInline
-                              muted={isSelf}
-                              className={`w-full h-full object-cover ${isSelf ? 'transform -scale-x-100' : ''}`}
-                            />
-                            
-                            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10 bg-black/60 backdrop-blur-md rounded-lg px-2 py-1 border border-white/5">
-                              <span className="text-[10px] text-white truncate max-w-[120px]">
-                                {participant.nickName || participant.name} {isSelf && '(You)'}
-                              </span>
-                              {isMutedState && (
-                                <MicOff className="w-3 h-3 text-red-400 shrink-0" />
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {/* Render hidden audio element so remote voice is always heard even when camera is off */}
-                            {!isSelf && participant.inCall && remoteStreams[pId] && (
-                              <audio
-                                ref={el => {
-                                  if (el) {
-                                    el.srcObject = remoteStreams[pId];
-                                  }
-                                }}
-                                autoPlay
-                                playsInline
-                                className="hidden"
-                              />
-                            )}
-
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-[#1a1f2e] flex items-center justify-center mb-1 border border-white/10 shrink-0 relative">
-                              {isSelf && currentUser?.profilePicture ? (
-                                <img src={currentUser.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-                              ) : participant?.profilePicture ? (
-                                <img src={participant.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-gold to-yellow-500" />
-                              )}
-                              
-                              {participant.inCall && (
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                  <VideoOff className="w-4 h-4 text-white/80" />
-                                </div>
-                              )}
-                            </div>
-                            
-                            <p className="text-xs text-white text-center font-medium line-clamp-1">
-                              {participant.nickName || participant.name}
-                              {isSelf ? ' (You)' : ''}
-                            </p>
-                            
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                              <p className="text-[10px] text-green-400">Online</p>
-                              {participant.inCall && (
-                                <span className="text-[9px] bg-green-500/20 text-green-300 px-1 py-0.5 rounded border border-green-500/20 font-semibold">
-                                  In Call
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="flex items-center gap-2 mt-1">
-                              {isMutedState && participant.inCall && (
-                                <div className="flex items-center gap-0.5 text-red-400 text-[10px]">
-                                  <MicOff className="w-2.5 h-2.5" />
-                                  <span>Muted</span>
-                                </div>
-                              )}
-
-                              {!isRoomHost && canUserControlPlayback(participant) && (
-                                <span className="text-[9px] bg-gold/10 text-gold px-1 py-0.5 rounded border border-gold/20 font-semibold">
-                                  Control
-                                </span>
-                              )}
-                            </div>
-
-                            {isRoomHost && !isSelf && (
-                              <button
-                                onClick={() => canUserControlPlayback(participant) ? handleRevokeControl(pId) : handleGrantControl(pId)}
-                                className={`mt-2 text-[9px] px-2 py-0.5 rounded border transition-all ${
-                                  canUserControlPlayback(participant)
-                                    ? 'bg-gold/20 text-gold border-gold/30 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30'
-                                    : 'bg-white/5 text-white/50 border-white/10 hover:bg-gold/20 hover:text-gold hover:border-gold/30'
-                                }`}
-                              >
-                                {canUserControlPlayback(participant) ? 'Revoke Control' : 'Grant Control'}
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
+                        participant={participant}
+                        isSelf={isSelf}
+                        inCall={inCall}
+                        isCameraOff={isCameraOff}
+                        isMuted={isMuted}
+                        isHandRaised={isHandRaised}
+                        localStream={localStream}
+                        remoteStream={remoteStreams[pId]}
+                        currentUser={currentUser}
+                        isRoomHost={isRoomHost}
+                        hasControl={hasControl}
+                        onGrantControl={handleGrantControl}
+                        onRevokeControl={handleRevokeControl}
+                      />
                     );
                   })}
                 </div>
