@@ -6,7 +6,7 @@ Random behavior on first join:
 - Sometimes both invisible
 - Only full page refresh fixes it
 - Section refresh button doesn't work
-
+xssssdd
 ## Root Cause
 Race conditions between:
 - Socket connection
