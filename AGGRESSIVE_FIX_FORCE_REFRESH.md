@@ -4,7 +4,7 @@
 Random behavior on first join:
 - Sometimes host visible, sometimes not
 - Sometimes both invisible
-- Only full page refresh fixes it
+- Only full page refresh fixes itaddewdwwr
 - Section refresh button doesn't work
 xssssdd
 ## Root Cause
